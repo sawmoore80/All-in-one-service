@@ -1,0 +1,7 @@
+*{box-sizing:border-box}
+body{margin:0;font-family:Inter,system-ui,Arial;background:#0b1220;color:#e5e7eb}
+.wrap{max-width:1080px;margin:0 auto;padding:24px}
+.hero{background:#0e1629;color:#fff;padding:64px 0;border-bottom:1px solid #1f2937}
+.btn{display:inline-block;background:#22d3ee;color:#0b1220;padding:10px 16px;border-radius:10px;text-decoration:none;font-weight:700;cursor:pointer}
+.panel{background:#0e1629;border:1px solid #1f2937;border-radius:16px;padding:16px;margin:16px 0}
+.footer{border-top:1px solid #1f2937;padding:16px 0;color:#94a3b8}
