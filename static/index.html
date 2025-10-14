@@ -2,10 +2,61 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>AdMind</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root{--bg:#0b0f14;--card:#121821;--muted:#8aa0b2;--accent:#4ea8ff}
+    body{font-family:Inter,Arial,sans-serif;margin:28px;color:#e8eef4;background:#0b0f14}
+    h1{margin:0 0 8px 0;font-size:40px}
+    .bar{margin:10px 0 20px 0}
+    .btn{padding:10px 14px;border-radius:8px;border:1px solid #2b3a49;background:#17202b;color:#e8eef4;margin-right:10px;cursor:pointer}
+    .btn:hover{background:#1a2633}
+    .section-title{font-size:22px;margin:24px 0 10px 0}
+    .card{background:var(--card);border:1px solid #223142;border-radius:12px;padding:14px;margin:8px 0}
+    pre{background:#0f141b;border:1px solid #1e2a36;border-radius:10px;padding:12px;overflow:auto}
+    table{width:100%;border-collapse:collapse;color:#e8eef4}
+    th,td{padding:10px;border-bottom:1px solid #1f2b39;font-size:14px}
+    th{color:#9fb3c8;text-align:left}
+    .kpis{display:grid;grid-template-columns:repeat(4,minmax(180px,1fr));gap:12px;margin:10px 0}
+    .kpi{background:#121a23;border:1px solid #203040;border-radius:12px;padding:14px}
+    .kpi .label{color:#9fb3c8;font-size:12px}
+    .kpi .value{font-size:22px;font-weight:700}
+    .kpi .sub{color:#8aa0b2;font-size:12px}
+    .rec{padding:12px;border-bottom:1px solid #1f2b39}
+    .rec-title{font-weight:700}
+    .grid{display:grid;grid-template-columns:1fr;gap:8px}
+    @media(min-width:900px){.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}}
+  </style>
 </head>
 <body>
+  <h1>AdMind</h1>
+  <div>Status: <strong id="status">checking…</strong></div>
+  <div class="bar">
+    <button class="btn" onclick="refreshHealth()">Check Health</button>
+    <button class="btn" onclick="seedDemo()">Seed Demo Data</button>
+  </div>
+
+  <div class="section-title">Overview</div>
+  <div class="kpis" id="kpis"></div>
+
+  <div class="grid2">
+    <div class="card"><canvas id="trendChart" height="140"></canvas></div>
+    <div class="card"><canvas id="topChart" height="140"></canvas></div>
+  </div>
+
+  <div class="section-title">Recommendations</div>
+  <div id="recs" class="card"></div>
+
+  <div class="section-title">Accounts</div>
+  <div class="card"><table>
+    <thead><tr><th>ID</th><th>Name</th><th>Platform</th><th>Monthly Spend</th></tr></thead>
+    <tbody id="accounts"></tbody>
+  </table></div>
+
   <div class="section-title">Campaigns</div>
   <div class="card"><table>
     <thead>
@@ -19,54 +70,8 @@
   </table></div>
 
   <div class="section-title">API Output</div>
-  <div class="card"><pre id="out" style="margin:0;white-space:pre-wrap"></pre></div>
+  <div class="card"><pre id="out">{}</pre></div>
 
-  <script src="/static/app.js"></script>
-</body>
-</html>
-<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8" />
-  <title>AdMind</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <style>
-    body { font-family: Inter, Arial, sans-serif; margin: 32px; color:#0f172a; }
-    h1 { margin-bottom: 8px; }
-    .bar { margin: 12px 0 20px; }
-    button { padding:10px 14px; border:1px solid #cbd5e1; border-radius:8px; background:#fff; cursor:pointer; margin-right:8px; }
-    button:hover { background:#f8fafc; }
-    .grid { display:grid; grid-template-columns:1fr; gap:16px; }
-    .card { border:1px solid #e2e8f0; border-radius:10px; padding:14px; background:#fff; }
-    .rec-title { font-weight:600; margin-bottom:6px; }
-    .rec-meta { color:#64748b; font-size:12px; margin-top:6px; }
-    table { width:100%; border-collapse:collapse; font-size:14px; }
-    th, td { border-bottom:1px solid #e2e8f0; padding:8px; text-align:left; }
-    th { background:#f8fafc; }
-    pre { background:#f6f8fa; padding:12px; border-radius:8px; overflow:auto; }
-  </style>
-</head>
-<body>
-  <h1>AdMind</h1>
-  <div class="bar">Status: <b id="status">checking…</b></div>
-
-  <div class="bar">
-    <button onclick="refreshHealth()">Check Health</button>
-    <button onclick="seedDemo()">Seed Demo Data</button>
-  </div>
-
-  <h2>Recommendations</h2>
-  <div id="recs" class="grid"></div>
-
-  <h2>Accounts</h2>
-  <div id="accounts" class="card"></div>
-
-  <h2>Campaigns</h2>
-  <div id="campaigns" class="card"></div>
-
-  <h2>API Output</h2>
-  <pre id="out">{}</pre>
-
-  <script src="/static/app.js?v=3"></script>
+  <script src="/static/app.js?v=6"></script>
 </body>
 </html>

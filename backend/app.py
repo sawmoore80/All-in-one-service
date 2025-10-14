@@ -177,3 +177,44 @@ ensure_schema()
 if __name__ == "__main__":
     port = int(os.environ.get("PORT","5000"))
     app.run(host="0.0.0.0", port=port)
+
+@app.get("/api/kpis")
+def kpis():
+    con = get_db(); cur = con.cursor()
+    cur.execute("""
+      SELECT IFNULL(SUM(spend),0) AS total_spend,
+             IFNULL(AVG(roas),0)  AS avg_roas,
+             IFNULL(AVG(cpa),0)   AS avg_cpa,
+             IFNULL(SUM(conversions),0) AS conversions
+      FROM campaigns
+    """)
+    row = cur.fetchone()
+    out = {k: row[k] for k in row.keys()} if row else {}
+    con.close()
+    return out
+
+@app.get("/api/trends")
+def trends():
+    """Generate simple 8-period trends from current campaign totals (synthetic)."""
+    con = get_db(); cur = con.cursor()
+    cur.execute("SELECT IFNULL(SUM(spend),0) AS spend, IFNULL(AVG(roas),0) AS roas FROM campaigns")
+    row = cur.fetchone() or {"spend":0,"roas":0}
+    total_spend = float(row["spend"] or 0)
+    avg_roas = float(row["roas"] or 0)
+    labels = [f"W-{i}" for i in range(7,-1,-1)]
+    # Distribute totals across 8 periods
+    import random
+    random.seed(42)
+    base = total_spend/8.0 if total_spend>0 else 100
+    spend = [round(base*(0.85+random.random()*0.3),2) for _ in labels]
+    roas  = [round(max(0.1, avg_roas*(0.85+random.random()*0.3)),2) for _ in labels]
+    top_labels, clicks = [], []
+    cur.execute("""SELECT name, clicks FROM campaigns ORDER BY clicks DESC LIMIT 5""")
+    for r in cur.fetchall() or []:
+      top_labels.append(r["name"]); clicks.append(int(r["clicks"] or 0))
+    con.close()
+    return {
+      "labels": labels,
+      "series": {"spend": spend, "roas": roas},
+      "top": {"labels": top_labels, "clicks": clicks}
+    }
