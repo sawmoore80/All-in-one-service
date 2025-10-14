@@ -2,6 +2,32 @@
 <html>
 <head>
   <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>AdMind</title>
+</head>
+<body>
+  <div class="section-title">Campaigns</div>
+  <div class="card"><table>
+    <thead>
+      <tr>
+        <th>ID</th><th>Account</th><th>Name</th><th>Status</th>
+        <th>Spend</th><th>CPA</th><th>ROAS</th><th>CTR</th>
+        <th>Impressions</th><th>Clicks</th><th>Conversions</th>
+      </tr>
+    </thead>
+    <tbody id="campaigns"></tbody>
+  </table></div>
+
+  <div class="section-title">API Output</div>
+  <div class="card"><pre id="out" style="margin:0;white-space:pre-wrap"></pre></div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
   <title>AdMind</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
