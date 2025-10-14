@@ -1,41 +1,95 @@
-const API_BASE = "https://admindtech.onrender.com";
-document.getElementById("yr").textContent = new Date().getFullYear();
+const API = ""; // same origin
 
-async function j(u, o){ const r = await fetch(u, o||{}); return r.json(); }
-function esc(s){ return (s||'').toString().replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+const $out = id => document.getElementById(id);
 
-function renderRecs(rs){
-  const el = document.getElementById('recs');
-  if(!rs || !rs.length){ el.innerHTML = '<i>No recommendations yet.</i>'; return; }
-  el.innerHTML = rs.map(r => `
-    <div class="panel" style="margin:8px 0">
-      <b>${esc(r.action)}</b>
-      <small>prio ${r.priority} · impact ${(+(r.impact_score||0)).toFixed(1)}</small>
-      <div>${esc(r.rationale)}</div>
-    </div>`).join('');
+async function call(path, opts={}) {
+  const r = await fetch(`${API}${path}`, {headers:{'Content-Type':'application/json'}, ...opts});
+  if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+  return r.json();
 }
 
-function renderAcc(a){
-  document.getElementById('accounts').innerHTML = (a||[]).map(x =>
-    `<div>${esc(x.name)} <small>(${esc(x.platform)})</small></div>`).join('');
+async function init() {
+  await refreshHealth();
+  await loadRecs();
+  await loadAccounts();
+  await loadCampaigns();
 }
 
-function renderCamp(c){
-  document.getElementById('campaigns').innerHTML = (c||[]).map(x =>
-    `<div style="padding:6px 0;border-bottom:1px solid #1f2937">
-      <b>${esc(x.name)}</b> — $${(+x.spend||0).toFixed(2)} | ROAS ${(+x.roas||0).toFixed(2)} | CTR ${(+x.ctr||0).toFixed(2)}%
-     </div>`).join('');
+async function refreshHealth() {
+  try {
+    const data = await call('/health');
+    $out('status').textContent = data.ok ? 'healthy' : 'error';
+  } catch (e) {
+    $out('status').textContent = 'error';
+  }
 }
 
-async function load(){
-  const a = await j('/api/accounts');      renderAcc(a.accounts||[]);
-  const c = await j('/api/campaigns');     renderCamp(c.campaigns||[]);
-  const r = await j('/api/recommendations'); renderRecs(r.recommendations||[]);
+async function seedDemo() {
+  $out('out').textContent = 'Seeding…';
+  try {
+    const data = await call('/api/seed', {method:'POST'});
+    $out('out').textContent = JSON.stringify(data, null, 2);
+    await loadRecs(); await loadAccounts(); await loadCampaigns();
+  } catch (e) {
+    $out('out').textContent = e.toString();
+  }
 }
 
-async function rebuild(){
-  await j('/api/recommendations',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
-  load();
+async function loadRecs() {
+  const data = await call('/api/recommendations');
+  const list = data.recommendations || [];
+  const el = $out('recs');
+  el.innerHTML = list.length ? '' : '<p>No recommendations yet.</p>';
+  for (const r of list) {
+    const div = document.createElement('div');
+    div.className = 'card';
+    div.innerHTML = `
+      <div class="rec-title">${r.title}</div>
+      <div class="rec-desc">${r.description || ''}</div>
+      <div class="rec-meta">Impact: ${r.impact_score.toFixed(2)} • Account #${r.account_id}</div>
+    `;
+    el.appendChild(div);
+  }
 }
 
-load();
+function renderTable(el, rows, cols) {
+  el.innerHTML = '';
+  const table = document.createElement('table');
+  table.innerHTML = `
+    <thead><tr>${cols.map(c=>`<th>${c.label}</th>`).join('')}</tr></thead>
+    <tbody>${rows.map(r=>`<tr>${cols.map(c=>`<td>${r[c.key] ?? ''}</td>`).join('')}</tr>`).join('')}</tbody>
+  `;
+  el.appendChild(table);
+}
+
+async function loadAccounts() {
+  const data = await call('/api/accounts');
+  renderTable($out('accounts'), data.accounts || [], [
+    {key:'id',label:'ID'},
+    {key:'name',label:'Name'},
+    {key:'platform',label:'Platform'},
+    {key:'monthly_spend',label:'Monthly Spend'},
+  ]);
+}
+
+async function loadCampaigns() {
+  const data = await call('/api/campaigns');
+  renderTable($out('campaigns'), data.campaigns || [], [
+    {key:'id',label:'ID'},
+    {key:'account_id',label:'Account'},
+    {key:'name',label:'Name'},
+    {key:'status',label:'Status'},
+    {key:'spend',label:'Spend'},
+    {key:'cpa',label:'CPA'},
+    {key:'roas',label:'ROAS'},
+    {key:'ctr',label:'CTR'},
+    {key:'impressions',label:'Impressions'},
+    {key:'clicks',label:'Clicks'},
+    {key:'conversions',label:'Conversions'},
+  ]);
+}
+
+window.seedDemo = seedDemo;
+window.refreshHealth = refreshHealth;
+
+document.addEventListener('DOMContentLoaded', init);
