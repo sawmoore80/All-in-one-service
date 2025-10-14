@@ -218,3 +218,167 @@ def trends():
       "series": {"spend": spend, "roas": roas},
       "top": {"labels": top_labels, "clicks": clicks}
     }
+
+# ================== INSIGHTS ENGINE + PLAYBOOK ==================
+def analyze_campaigns(con):
+    """
+    Returns specific, scored insights per campaign, with evidence & actions.
+    """
+    cur = con.cursor()
+    cur.execute("SELECT * FROM campaigns")
+    rows = [dict(r) for r in cur.fetchall()]
+    if not rows:
+        return []
+
+    import statistics
+    avg_cpa  = statistics.fmean([r["cpa"]  for r in rows if r.get("cpa")  is not None]) if rows else 0
+    avg_roas = statistics.fmean([r["roas"] for r in rows if r.get("roas") is not None]) if rows else 0
+    avg_ctr  = statistics.fmean([r["ctr"]  for r in rows if r.get("ctr")  is not None]) if rows else 0
+
+    insights = []
+    iid = 1
+
+    def add(c, title, severity, kpi, expected_impact, evidence, actions, weight=1.0):
+        nonlocal iid
+        spend = float(c.get("spend") or 0)
+        score = round(expected_impact * (1.0 + min(spend/1000.0, 5.0)) * weight, 2)
+        insights.append({
+            "id": iid,
+            "campaign_id": c["id"],
+            "campaign_name": c["name"],
+            "severity": severity,
+            "kpi": kpi,
+            "title": title,
+            "expected_impact": expected_impact,
+            "priority_score": score,
+            "evidence": evidence,
+            "actions": actions
+        })
+        iid += 1
+
+    for c in rows:
+        ctr  = float(c.get("ctr") or 0)
+        cpa  = float(c.get("cpa") or 0)
+        roas = float(c.get("roas") or 0)
+        spend= float(c.get("spend") or 0)
+        name = (c.get("name") or "").lower()
+
+        # CTR improvement
+        import math
+        ctr_target = max(1.0, avg_ctr*0.9) if avg_ctr else 1.0
+        if ctr < ctr_target:
+            add(
+                c,
+                title=f"Raise CTR on {c['name']}",
+                severity="high" if ctr < 0.8 else "med",
+                kpi="CTR",
+                expected_impact=0.70 if ctr < 0.8 else 0.45,
+                evidence={"ctr": f"{ctr:.2f}%", "benchmark_ctr": f"{ctr_target:.2f}%", "spend": spend},
+                actions=[
+                    "Ship 5 new hooks (first 2s = problem ➜ promise, product in frame).",
+                    "Test 1:1, 4:5, 9:16 crops. Lead with benefit copy+price anchor.",
+                    "Pause any ad <0.60% CTR for 48h."
+                ],
+                weight=1.0
+            )
+
+        # CPA high vs average
+        if avg_cpa and cpa > avg_cpa * 1.25 and cpa > 25:
+            delta = f"+{((cpa/avg_cpa)-1)*100:.0f}%"
+            add(
+                c,
+                title=f"Cut CPA on {c['name']}",
+                severity="high",
+                kpi="CPA",
+                expected_impact=0.65,
+                evidence={"cpa": f"${cpa:.0f}", "avg_cpa": f"${avg_cpa:.0f}", "delta": delta, "spend": spend},
+                actions=[
+                    "Narrow audience (stack top 3 interests), exclude recent visitors.",
+                    "Add strong CTA + objection handling in first 3 sec.",
+                    "Try highest-volume bidding with 10–15% lower cap."
+                ],
+                weight=1.2
+            )
+
+        # ROAS target by intent
+        target_roas = 1.0
+        if "brand" in name or "search" in name:
+            target_roas = 2.5
+        elif "remarketing" in name:
+            target_roas = 2.0
+
+        if roas < target_roas:
+            add(
+                c,
+                title=f"Lift ROAS on {c['name']}",
+                severity="high" if roas < target_roas*0.8 else "med",
+                kpi="ROAS",
+                expected_impact=0.75 if roas < target_roas*0.8 else 0.5,
+                evidence={"roas": f"{roas:.2f}", "target_roas": f"{target_roas:.2f}", "spend": spend},
+                actions=[
+                    "Add price anchor (MSRP vs Now) + guarantee top-of-frame.",
+                    "Swap first frame to strongest review (stars + count).",
+                    "Send traffic to highest-CVR LP; strip header nav."
+                ],
+                weight=1.1
+            )
+
+        # Scale winners
+        if avg_roas and avg_cpa and roas >= max(2.5, avg_roas*1.2) and cpa <= max(25, avg_cpa*0.9):
+            add(
+                c,
+                title=f"Scale budget +20–30% on {c['name']}",
+                severity="med",
+                kpi="Spend",
+                expected_impact=0.60,
+                evidence={"roas": f"{roas:.2f}", "cpa": f"${cpa:.0f}", "avg_roas": f"{avg_roas:.2f}", "avg_cpa": f"${avg_cpa:.0f}"},
+                actions=[
+                    "Increase daily budget 20–30% (avoid >40%).",
+                    "Clone winning ad set; 70/30 creative split.",
+                    "Guardrail: pause if ROAS < 1.8 for 48h."
+                ],
+                weight=0.9
+            )
+
+    insights.sort(key=lambda x: x["priority_score"], reverse=True)
+    return insights
+
+@app.get("/api/insights")
+def api_insights():
+    con = get_db()
+    data = analyze_campaigns(con)
+    con.close()
+    return {"ok": True, "insights": data}
+
+@app.post("/api/playbook")
+def api_playbook():
+    payload = request.get_json(silent=True) or {}
+    sel = payload.get("insight_ids")
+    con = get_db()
+    all_insights = analyze_campaigns(con)
+    con.close()
+
+    if sel:
+        chosen = [i for i in all_insights if i["id"] in set(sel)]
+    else:
+        chosen = all_insights[:5]
+
+    days = ["Day 1","Day 2","Day 3","Day 4","Day 5","Day 6","Day 7"]
+    plan = []
+    for idx, ins in enumerate(chosen):
+        d = days[idx % len(days)]
+        plan.append({
+            "day": d,
+            "title": ins["title"],
+            "kpi": ins["kpi"],
+            "severity": ins["severity"],
+            "what_to_ship": ins["actions"][:3],
+            "how_to_measure": [
+                f"Primary KPI: {ins['kpi']}",
+                f"Expected impact: +{int(ins['expected_impact']*100)}%",
+                "Review after 48h; keep if KPI improves vs baseline."
+            ],
+            "evidence": ins["evidence"]
+        })
+    return {"ok": True, "plan": plan}
+# ================== /INSIGHTS ENGINE ==================
