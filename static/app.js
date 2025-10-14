@@ -1,3 +1,4 @@
+const API_BASE = "https://admindtech.onrender.com";
 document.getElementById("yr").textContent = new Date().getFullYear();
 
 async function j(u, o){ const r = await fetch(u, o||{}); return r.json(); }
