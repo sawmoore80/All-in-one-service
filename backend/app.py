@@ -1,4 +1,150 @@
-import os, sqlite3, threading
+import os
+import sqlite3
+import threading
+from flask import Flask, jsonify, request, send_from_directory
+from flask_cors import CORS
+from pathlib import Path
+
+# Flask app & CORS
+ROOT_DIR = Path(__file__).resolve().parent.parent
+app = Flask(__name__, static_folder=str(ROOT_DIR / "static"))
+CORS(app)
+
+# Use ephemeral DB path on Render to avoid locks
+DB_PATH = "/tmp/admind.db"
+write_lock = threading.Lock()
+
+def get_db():
+    con = sqlite3.connect(DB_PATH, check_same_thread=False)
+    con.row_factory = sqlite3.Row
+    # Make SQLite better behaved in containers
+    con.execute("PRAGMA journal_mode=WAL;")
+    con.execute("PRAGMA synchronous=NORMAL;")
+    return con
+
+def dicts(cursor):
+    return [dict(row) for row in cursor.fetchall()]
+
+def ensure_schema():
+    """
+    Clean-create schema so we never mismatch columns between deploys.
+    """
+    con = get_db()
+    cur = con.cursor()
+    cur.execute("DROP TABLE IF EXISTS recommendations;")
+    cur.execute("DROP TABLE IF EXISTS campaigns;")
+    cur.execute("DROP TABLE IF EXISTS accounts;")
+    cur.execute("""
+        CREATE TABLE accounts(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT,
+            platform TEXT,
+            external_id TEXT,
+            monthly_spend REAL
+        );
+    """)
+    cur.execute("""
+        CREATE TABLE campaigns(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            account_id INTEGER,
+            name TEXT,
+            status TEXT,
+            spend REAL,
+            cpa REAL,
+            roas REAL,
+            ctr REAL,
+            impressions INTEGER,
+            clicks INTEGER,
+            conversions INTEGER
+        );
+    """)
+    cur.execute("""
+        CREATE TABLE recommendations(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            account_id INTEGER,
+            impact_score REAL,
+            detail TEXT
+        );
+    """)
+    con.commit()
+    con.close()
+
+def build_recommendations(con, account_id: int):
+    """
+    Insert some demo recommendations for testing.
+    """
+    cur = con.cursor()
+    cur.executemany(
+        "INSERT INTO recommendations(account_id, impact_score, detail) VALUES(?,?,?)",
+        [
+            (account_id, 0.95, "Lower your CPA by 8–12% by tightening age/device splits."),
+            (account_id, 0.85, "Shift $500 from low-ROAS UGC to brand search."),
+            (account_id, 0.75, "Add 7-day viewer remarketing; expected +14% conv."),
+        ],
+    )
+    con.commit()
+
+# Create schema at startup
+ensure_schema()
+
+@app.route("/health")
+def health():
+    return jsonify(ok=True, status="healthy")
+
+@app.route("/")
+def index():
+    # Serve the static SPA
+    return send_from_directory(app.static_folder, "index.html")
+
+@app.route("/api/seed", methods=["POST"])
+def seed():
+    """
+    Resets schema, inserts one demo account + demo campaigns, then builds recs.
+    Safe to call multiple times.
+    """
+    with write_lock:
+        ensure_schema()
+        con = get_db()
+        cur = con.cursor()
+        cur.execute(
+            "INSERT INTO accounts(name, platform, external_id, monthly_spend) VALUES(?,?,?,?)",
+            ("Demo Brand", "meta", "demo-123", 5000),
+        )
+        acc_id = cur.lastrowid
+
+        rows = [
+            (acc_id, "Prospecting - Broad", "active", 1250, 48, 0.72, 0.65, 85000, 553, 92),
+            (acc_id, "Remarketing - 7d",   "active", 980,  22, 2.35, 1.45, 42000, 609, 143),
+            (acc_id, "Search - Brand",     "active", 1670, 12, 3.10, 2.20, 36000, 792, 218),
+            (acc_id, "Creators - UGC",     "active", 820,  35, 1.10, 0.75, 51000, 383, 62),
+        ]
+        cur.executemany(
+            """
+            INSERT INTO campaigns(
+                account_id, name, status, spend, cpa, roas, ctr, impressions, clicks, conversions
+            ) VALUES(?,?,?,?,?,?,?,?,?,?)
+            """,
+            rows,
+        )
+        con.commit()
+
+        build_recommendations(con, account_id=acc_id)
+        con.close()
+        return jsonify(ok=True, seeded_account_id=acc_id)
+
+@app.route("/api/recommendations", methods=["GET"])
+def recommendations():
+    con = get_db()
+    cur = con.cursor()
+    cur.execute("SELECT * FROM recommendations ORDER BY impact_score DESC, id DESC;")
+    data = dicts(cur)
+    con.close()
+    return jsonify(ok=True, recommendations=data)
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", "5000"))
+    app.run(host="0.0.0.0", port=port)
+oimport os, sqlite3, threading
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 from pathlib import Path
