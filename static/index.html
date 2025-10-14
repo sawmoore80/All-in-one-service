@@ -5,35 +5,42 @@
   <title>AdMind</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    body { font-family: Inter, Arial, sans-serif; margin: 40px; }
-    button { padding: 10px 16px; margin-right: 8px; }
-    pre { background:#f6f8fa; padding:16px; border-radius:8px; overflow:auto; }
+    body { font-family: Inter, Arial, sans-serif; margin: 32px; color:#0f172a; }
+    h1 { margin-bottom: 8px; }
+    .bar { margin: 12px 0 20px; }
+    button { padding:10px 14px; border:1px solid #cbd5e1; border-radius:8px; background:#fff; cursor:pointer; margin-right:8px; }
+    button:hover { background:#f8fafc; }
+    .grid { display:grid; grid-template-columns:1fr; gap:16px; }
+    .card { border:1px solid #e2e8f0; border-radius:10px; padding:14px; background:#fff; }
+    .rec-title { font-weight:600; margin-bottom:6px; }
+    .rec-meta { color:#64748b; font-size:12px; margin-top:6px; }
+    table { width:100%; border-collapse:collapse; font-size:14px; }
+    th, td { border-bottom:1px solid #e2e8f0; padding:8px; text-align:left; }
+    th { background:#f8fafc; }
+    pre { background:#f6f8fa; padding:12px; border-radius:8px; overflow:auto; }
   </style>
 </head>
 <body>
   <h1>AdMind</h1>
-  <p>Status: <span id="status">checking…</span></p>
-  <div>
-    <button onclick="checkHealth()">Check Health</button>
+  <div class="bar">Status: <b id="status">checking…</b></div>
+
+  <div class="bar">
+    <button onclick="refreshHealth()">Check Health</button>
+    <button onclick="seedDemo()">Seed Demo Data</button>
   </div>
-  <pre id="out"></pre>
 
-<script>
-const API = ""; // same origin
+  <h2>Recommendations</h2>
+  <div id="recs" class="grid"></div>
 
-async function checkHealth(){
-  const r = await fetch(`${API}/health`)
-    .then(r=>r.json())
-    .catch(e=>({error: e.toString()}));
-  document.getElementById('out').textContent = JSON.stringify(r, null, 2);
-}
+  <h2>Accounts</h2>
+  <div id="accounts" class="card"></div>
 
-(async ()=>{
-  const r = await fetch(`${API}/health`)
-    .then(r=>r.json())
-    .catch(e=>({error: e.toString()}));
-  document.getElementById('status').textContent = r.ok ? 'healthy' : (r.error || 'error');
-})();
-</script>
+  <h2>Campaigns</h2>
+  <div id="campaigns" class="card"></div>
+
+  <h2>API Output</h2>
+  <pre id="out">{}</pre>
+
+  <script src="/static/app.js?v=3"></script>
 </body>
 </html>
