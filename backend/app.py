@@ -252,3 +252,21 @@ def root_index():
 def _err(e):
   import traceback
   return {"ok": False, "error": str(e), "trace": traceback.format_exc().splitlines()[-10:]}, 500
+
+@app.get("/_ping")
+def _ping():
+    return {"ok": True, "pong": True}
+
+@app.get("/_healthz")
+def _healthz():
+    return {"ok": True}
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+
+@app.get("/")
+def index_root():
+    try:
+        return app.send_static_file("index.html")
+    except Exception:
+        return "<h1>AdMind</h1><p>Static not found. Ensure static/index.html exists.</p>", 200
