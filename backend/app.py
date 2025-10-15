@@ -270,3 +270,65 @@ def index_root():
         return app.send_static_file("index.html")
     except Exception:
         return "<h1>AdMind</h1><p>Static not found. Ensure static/index.html exists.</p>", 200
+
+# ===== reliability & session settings =====
+import logging
+app.config.update(
+    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=os.getenv("SESSION_COOKIE_SECURE","1")=="1",
+    JSON_SORT_KEYS=False,
+)
+logging.basicConfig(level=logging.INFO)
+
+@app.get("/api/ping")
+def api_ping():
+    return {"ok": True, "ts": __import__("time").time()}
+
+@app.after_request
+def _no_cache(resp):
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+@app.errorhandler(404)
+def _nf(e):
+    return {"ok": False, "error": "not_found", "path": request.path}, 404
+
+@app.errorhandler(500)
+def _ise(e):
+    import traceback
+    return {"ok": False, "error": "server_error", "trace": traceback.format_exc().splitlines()[-6:]}, 500
+
+# ===== idempotent: guarantee endpoints used by UI =====
+@app.post("/api/playbook")
+def api_playbook_safe():
+    d = request.get_json(silent=True) or {}
+    insights = get_insights()["insights"] if "get_insights" in globals() else []
+    sel = d.get("insight_ids")
+    chosen = [i for i in insights if not sel or i["id"] in set(sel)] or insights[:5]
+    days = ["Day 1","Day 2","Day 3","Day 4","Day 5","Day 6","Day 7"]
+    plan=[]
+    for idx, ins in enumerate(chosen[:7]):
+        plan.append({
+            "day": days[idx],
+            "title": ins.get("title","Action"),
+            "kpi": ins.get("kpi",""),
+            "severity": ins.get("severity",""),
+            "what_to_ship": (ins.get("actions") or [])[:3],
+            "how_to_measure": [
+                f"Primary KPI: {ins.get('kpi','')}",
+                f"Expected impact: +{int((ins.get('expected_impact') or 0)*100)}%",
+                "Review after 48h; keep if KPI improves vs baseline."
+            ]
+        })
+    return {"ok": True, "plan": plan}
+
+# harmless fallback KPIs / trends / insights if not defined
+if "get_kpis" not in globals():
+    @app.get("/api/kpis")
+    def get_kpis(): return {"ok": True,"total_spend":0,"avg_roas":0,"avg_cpa":0,"conversions":0}
+if "get_trends" not in globals():
+    @app.get("/api/trends")
+    def get_trends(): return {"ok": True,"labels":[],"series":{"spend":[],"roas":[]},"top":{"labels":[],"clicks":[]}}
+if "get_insights" not in globals():
+    @app.get("/api/insights")
+    def get_insights(): return {"ok": True,"insights":[]}
