@@ -253,3 +253,7 @@ def _ping(): return ok(pong=True)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT",5000)))
+
+
+from auth import bp as auth_bp
+app.register_blueprint(auth_bp)
