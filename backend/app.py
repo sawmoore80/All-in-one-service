@@ -637,3 +637,81 @@ def api_me():
     if current_user.is_authenticated:
         return {"ok": True, "auth": True, "email": getattr(current_user, "email", None)}
     return {"ok": True, "auth": False}
+
+# --- Health Check ---
+@app.get("/health")
+def health():
+    return {"ok": True, "status": "healthy"}
+
+# --- Seed Demo Data ---
+@app.post("/api/seed")
+def seed_demo():
+    # fake seed data for charts and recs
+    return {"ok": True, "message": "Demo data seeded"}
+
+# --- Mock Insights ---
+@app.get("/api/insights")
+def get_insights():
+    return {
+        "ok": True,
+        "insights": [
+            {
+                "id": 1,
+                "title": "Lift ROAS on Prospecting - Broad",
+                "campaign_name": "Prospecting - Broad",
+                "kpi": "ROAS",
+                "severity": "high",
+                "priority_score": 1.86,
+                "evidence": {"roas": "0.72", "spend": 1250, "target_roas": "1.00"},
+                "actions": [
+                    "Add price anchor (MSRP vs Now) + guarantee top-of-frame",
+                    "Swap first frame to strongest review (stars + count)",
+                    "Send traffic to highest-CVR LP; strip header nav"
+                ],
+                "expected_impact": 0.75
+            }
+        ]
+    }
+
+# --- Mock KPIs ---
+@app.get("/api/kpis")
+def get_kpis():
+    return {"ok": True, "total_spend": 4720, "avg_roas": 1.82, "avg_cpa": 29, "conversions": 515}
+
+# --- Mock Trends ---
+@app.get("/api/trends")
+def get_trends():
+    labels = [f"W-{i}" for i in range(7)]
+    spend = [600, 520, 640, 580, 620, 655, 690]
+    roas = [1.6, 1.52, 1.68, 1.70, 1.75, 1.78, 1.82]
+    top = {"labels": ["Search - Brand", "Remarketing - 7d", "Prospecting - Broad", "Creators - UGC"], "clicks": [1000, 750, 720, 350]}
+    return {"ok": True, "labels": labels, "series": {"spend": spend, "roas": roas}, "top": top}
+
+# --- Social OAuth mock endpoints ---
+@app.get("/api/oauth/<platform>")
+def oauth_login_mock(platform):
+    # In real life: generate OAuth URL
+    return {"ok": True, "auth_url": f"https://auth.{platform}.com/demo_oauth"}
+
+@app.get("/api/social/connections")
+def list_connections():
+    return {
+        "ok": True,
+        "connections": [
+            {"platform": "Instagram", "connected": False},
+            {"platform": "TikTok", "connected": False},
+            {"platform": "Facebook", "connected": False},
+            {"platform": "YouTube", "connected": False}
+        ]
+    }
+
+@app.post("/api/social/mock_pull")
+def mock_pull_posts():
+    return {"ok": True, "message": "Demo posts added"}
+
+# --- AI Assistant mock endpoint ---
+@app.post("/api/ai/ask")
+def ai_ask():
+    q = request.json.get("q", "")
+    # Simple mock answer — replace with OpenAI or other model later
+    return {"ok": True, "answer": f"🤖 AI thinks you should optimize creative based on: '{q}'"}
