@@ -77,6 +77,24 @@
         <pre id="out">—</pre>
       </div>
     </div>
+
+    <div class="grid" style="margin-top:16px">
+      <div class="card">
+        <h3>Contact Us</h3>
+        <div class="sub">Call us: <b>203-448-8241</b></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+          <input id="c_name" placeholder="Your name">
+          <input id="c_email" placeholder="Your email">
+          <input id="c_company" placeholder="Company (optional)">
+          <input id="c_phone" placeholder="Phone (optional)">
+        </div>
+        <textarea id="c_msg" placeholder="How can we help?" style="width:100%;margin-top:8px;height:90px;border-radius:10px;border:1px solid #1d2940;background:#0b1322;color:#e6f0ff;padding:10px"></textarea>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button class="btn" onclick="submitContact()">Submit</button>
+          <a class="btn primary" href="mailto:sawmoore80@gmail.com?subject=Free%20Quote%20Meeting&body=Hi%20AdMind%2C%20I%27d%20like%20a%20free%20quote.">Book Free Quote</a>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- Account Modal -->
@@ -112,5 +130,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" crossorigin="anonymous"></script>
   <script src="/static/app.js"></script>
+  <!-- v:force -->
 </body>
 </html>

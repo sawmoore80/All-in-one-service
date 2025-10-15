@@ -715,3 +715,245 @@ def ai_ask():
     q = request.json.get("q", "")
     # Simple mock answer — replace with OpenAI or other model later
     return {"ok": True, "answer": f"🤖 AI thinks you should optimize creative based on: '{q}'"}
+
+# ====== PERSISTENT AUTH + CONTACT + POSTS ======
+import sqlite3, os, json, smtplib
+from email.mime.text import MIMEText
+from email.utils import formataddr
+from dotenv import load_dotenv
+from flask import request
+from flask_login import LoginManager, login_user, logout_user, login_required, UserMixin, current_user
+from flask_bcrypt import Bcrypt
+
+load_dotenv()
+app.secret_key = os.getenv("SECRET_KEY", "devkey")
+bcrypt = Bcrypt(app)
+login_manager = LoginManager(app)
+login_manager.login_view = "api_login"
+
+def db():
+    con = sqlite3.connect("admind.db")
+    con.row_factory = sqlite3.Row
+    return con
+
+# Init tables
+with db() as con:
+    con.executescript("""
+    CREATE TABLE IF NOT EXISTS users(
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      email TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS social_connections(
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      platform TEXT NOT NULL,
+      access_token TEXT,
+      meta_json TEXT,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(user_id, platform)
+    );
+    CREATE TABLE IF NOT EXISTS posts(
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      platform TEXT NOT NULL,
+      post_id TEXT,
+      title TEXT,
+      caption TEXT,
+      metrics_json TEXT,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS contacts(
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT, email TEXT, company TEXT, phone TEXT,
+      message TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+    """)
+
+class User(UserMixin):
+    def __init__(self, row):
+        self.id = row["id"]
+        self.email = row["email"]
+        self.password_hash = row["password_hash"]
+
+@login_manager.user_loader
+def load_user(user_id):
+    with db() as con:
+        r = con.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
+    return User(r) if r else None
+
+# Auth endpoints
+@app.post("/api/register")
+def api_register():
+    data = request.get_json(force=True)
+    email = (data.get("email") or "").strip().lower()
+    password = data.get("password") or ""
+    if not email or not password: return {"ok": False, "error": "email & password required"}, 400
+    pw = bcrypt.generate_password_hash(password).decode("utf-8")
+    try:
+        with db() as con:
+            con.execute("INSERT INTO users(email,password_hash) VALUES(?,?)", (email, pw))
+            r = con.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
+    except sqlite3.IntegrityError:
+        return {"ok": False, "error": "user exists"}, 400
+    login_user(User(r))
+    return {"ok": True, "user": {"id": r["id"], "email": r["email"]}}
+
+@app.post("/api/login")
+def api_login():
+    data = request.get_json(force=True)
+    email = (data.get("email") or "").strip().lower()
+    password = data.get("password") or ""
+    with db() as con:
+        r = con.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
+    if not r or not bcrypt.check_password_hash(r["password_hash"], password):
+        return {"ok": False, "error": "invalid credentials"}, 401
+    login_user(User(r))
+    return {"ok": True, "user": {"id": r["id"], "email": r["email"]}}
+
+@app.get("/api/logout")
+@login_required
+def api_logout():
+    logout_user()
+    return {"ok": True}
+
+@app.get("/api/me")
+def api_me():
+    if current_user.is_authenticated:
+        return {"ok": True, "auth": True, "email": getattr(current_user, "email", None)}
+    return {"ok": True, "auth": False}
+
+# Contact form: store + email
+def _send_email(subject, body_text):
+    host=os.getenv("SMTP_HOST"); port=int(os.getenv("SMTP_PORT","587"))
+    user=os.getenv("SMTP_USER"); pwd=os.getenv("SMTP_PASS")
+    use_tls=os.getenv("SMTP_TLS","1")=="1"
+    to=os.getenv("OWNER_EMAIL","sawmoore80@gmail.com")
+    if not (host and port and user and pwd):
+        return False  # email disabled if not configured
+    msg = MIMEText(body_text, "plain")
+    msg["Subject"]=subject
+    msg["From"]=formataddr(("AdMind", user))
+    msg["To"]=to
+    s = smtplib.SMTP(host, port, timeout=10)
+    if use_tls: s.starttls()
+    s.login(user, pwd)
+    s.sendmail(user, [to], msg.as_string())
+    s.quit()
+    return True
+
+@app.post("/api/contact")
+def api_contact():
+    data = request.get_json(force=True)
+    name=data.get("name",""); email=data.get("email",""); company=data.get("company",""); phone=data.get("phone",""); message=data.get("message","")
+    with db() as con:
+        con.execute("INSERT INTO contacts(name,email,company,phone,message) VALUES(?,?,?,?,?)",(name,email,company,phone,message))
+    sent = False
+    try:
+        sent = _send_email(
+            "New AdMind Contact",
+            f"Name: {name}\nEmail: {email}\nCompany: {company}\nPhone: {phone}\n\nMessage:\n{message}"
+        )
+    except Exception:
+        sent = False
+    return {"ok": True, "stored": True, "emailed": sent}
+
+# Posts list (for UI)
+@app.get("/api/posts")
+@login_required
+def api_posts():
+    with db() as con:
+        rows = [dict(r) for r in con.execute("SELECT platform, post_id, title, caption, metrics_json FROM posts WHERE user_id=? ORDER BY id DESC",(current_user.id,)).fetchall()]
+    for r in rows:
+        try: r["metrics"] = json.loads(r.pop("metrics_json") or "{}")
+        except: r["metrics"] = {}
+    return {"ok": True, "posts": rows}
+# ====== /PERSISTENT AUTH + CONTACT + POSTS ======
+import sqlite3, os, json, smtplib
+from email.mime.text import MIMEText
+from email.utils import formataddr
+from dotenv import load_dotenv
+from flask import request
+from flask_login import LoginManager, login_user, logout_user, login_required, UserMixin, current_user
+from flask_bcrypt import Bcrypt
+
+load_dotenv()
+app.secret_key = os.getenv("SECRET_KEY", "devkey")
+bcrypt = Bcrypt(app)
+login_manager = LoginManager(app)
+login_manager.login_view = "api_login"
+
+def db():
+    con = sqlite3.connect("admind.db")
+    con.row_factory = sqlite3.Row
+    return con
+
+with db() as con:
+    con.executescript("""
+    CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY AUTOINCREMENT,email TEXT UNIQUE NOT NULL,password_hash TEXT NOT NULL,created_at TEXT DEFAULT CURRENT_TIMESTAMP);
+    CREATE TABLE IF NOT EXISTS contacts(id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT,email TEXT,company TEXT,phone TEXT,message TEXT,created_at TEXT DEFAULT CURRENT_TIMESTAMP);
+    """)
+
+class User(UserMixin):
+    def __init__(self, row):
+        self.id = row["id"]
+        self.email = row["email"]
+
+@login_manager.user_loader
+def load_user(user_id):
+    with db() as con:
+        r = con.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
+    return User(r) if r else None
+
+@app.post("/api/register")
+def api_register():
+    d=request.get_json(force=True);e=d.get("email","").strip().lower();p=d.get("password","")
+    if not e or not p: return {"ok":False,"error":"email & password required"},400
+    pw=bcrypt.generate_password_hash(p).decode("utf-8")
+    try:
+        with db() as con:
+            con.execute("INSERT INTO users(email,password_hash) VALUES(?,?)",(e,pw))
+            r=con.execute("SELECT * FROM users WHERE email=?",(e,)).fetchone()
+    except sqlite3.IntegrityError:
+        return {"ok":False,"error":"user exists"},400
+    login_user(User(r))
+    return {"ok":True,"user":{"id":r["id"],"email":r["email"]}}
+
+@app.post("/api/login")
+def api_login():
+    d=request.get_json(force=True);e=d.get("email","").strip().lower();p=d.get("password","")
+    with db() as con:
+        r=con.execute("SELECT * FROM users WHERE email=?",(e,)).fetchone()
+    if not r: return {"ok":False,"error":"invalid"},401
+    from flask_bcrypt import check_password_hash
+    if not bcrypt.check_password_hash(r["password_hash"],p): return {"ok":False,"error":"invalid"},401
+    login_user(User(r))
+    return {"ok":True,"user":{"id":r["id"],"email":r["email"]}}
+
+@app.get("/api/logout")
+@login_required
+def api_logout():
+    logout_user();return {"ok":True}
+
+@app.get("/api/me")
+def api_me():
+    if current_user.is_authenticated:
+        return {"ok":True,"auth":True,"email":current_user.email}
+    return {"ok":True,"auth":False}
+
+def _send_email(sub,body):
+    host=os.getenv("SMTP_HOST");port=int(os.getenv("SMTP_PORT","587"))
+    user=os.getenv("SMTP_USER");pwd=os.getenv("SMTP_PASS")
+    if not (host and port and user and pwd):return False
+    msg=MIMEText(body,"plain");msg["Subject"]=sub;msg["From"]=formataddr(("AdMind",user));msg["To"]=os.getenv("OWNER_EMAIL")
+    s=smtplib.SMTP(host,port,timeout=10);s.starttls();s.login(user,pwd);s.sendmail(user,[os.getenv("OWNER_EMAIL")],msg.as_string());s.quit();return True
+
+@app.post("/api/contact")
+def api_contact():
+    d=request.get_json(force=True)
+    n=d.get("name","");em=d.get("email","");co=d.get("company","");ph=d.get("phone","");m=d.get("message","")
+    with db() as con:
+        con.execute("INSERT INTO contacts(name,email,company,phone,message) VALUES(?,?,?,?,?)",(n,em,co,ph,m))
+    sent=_send_email("New Contact",f"Name: {n}\nEmail: {em}\nCompany: {co}\nPhone: {ph}\n\n{m}")
+    return {"ok":True,"emailed":sent}

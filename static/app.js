@@ -1,40 +1,30 @@
 const $=(id)=>document.getElementById(id);
 let trendChart, topChart, selectedForPlan=new Set();
 
-// --- helpers ---
+// helpers
 function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200);}
 function showOut(o){$('out').textContent=typeof o==='string'?o:JSON.stringify(o,null,2);}
 async function call(path, opts={}){const r=await fetch(path,{headers:{'Content-Type':'application/json'},credentials:'include',...opts});const txt=await r.text();let d;try{d=JSON.parse(txt);}catch{d={raw:txt}};if(!r.ok)throw d;return d;}
 
-// --- account modal ---
+// account modal
 function openAuth(){ $('authModal').style.display='flex'; }
 function closeAuth(){ $('authModal').style.display='none'; }
 async function refreshAuthBadge(){
-  try{
-    const d = await call('/api/me');
-    if(d.auth){ $('authBadge').textContent = d.email || 'User'; $('whoami').textContent = d.email || 'user'; }
-    else { $('authBadge').textContent = 'Guest'; $('whoami').textContent = 'guest'; }
-  }catch(e){ $('authBadge').textContent='Guest'; }
+  try{ const d = await call('/api/me'); if(d.auth){ $('authBadge').textContent = d.email || 'User'; $('whoami').textContent = d.email || 'user'; } else { $('authBadge').textContent='Guest'; $('whoami').textContent='guest'; } }
+  catch(e){ $('authBadge').textContent='Guest'; }
 }
 
-// --- auth actions ---
-async function register(){
-  const email=$('email').value, password=$('password').value;
-  const d=await call('/api/register',{method:'POST',body:JSON.stringify({email,password})});
-  if(d.ok){ toast('Account created'); await refreshAuthBadge(); closeAuth(); loadAll(); } else { toast(d.error||'Error'); }
-}
-async function login(){
-  const email=$('email').value, password=$('password').value;
-  const d=await call('/api/login',{method:'POST',body:JSON.stringify({email,password})});
-  if(d.ok){ toast('Signed in'); await refreshAuthBadge(); closeAuth(); loadAll(); } else { toast(d.error||'Error'); }
-}
-async function logout(){ try{ await call('/api/logout'); toast('Signed out'); await refreshAuthBadge(); }catch(e){ toast('Logout error'); }}
+// auth
+async function register(){ const email=$('email').value, password=$('password').value; const d=await call('/api/register',{method:'POST',body:JSON.stringify({email,password})}); if(d.ok){ toast('Account created'); await refreshAuthBadge(); closeAuth(); loadAll(); } else { toast(d.error||'Error'); } }
+async function login(){ const email=$('email').value, password=$('password').value; const d=await call('/api/login',{method:'POST',body:JSON.stringify({email,password})}); if(d.ok){ toast('Signed in'); await refreshAuthBadge(); closeAuth(); loadAll(); } else { toast(d.error||'Error'); } }
+async function logout(){ try{ await call('/api/logout'); toast('Signed out'); await refreshAuthBadge(); }catch(e){ toast('Logout error'); } }
 
-// --- charts + UI ---
+// charts
 function currency(n){return '$'+(Number(n)||0).toLocaleString(undefined,{maximumFractionDigits:0});}
 function ensureTrendChart(labels,spend,roas){const el=$('trendChart'); if(!el||!window.Chart) return; if(trendChart) trendChart.destroy(); trendChart=new Chart(el,{type:'line',data:{labels,datasets:[{label:'Spend',data:spend,borderColor:'#4ea8ff',backgroundColor:'rgba(78,168,255,.12)',yAxisID:'y',tension:.35},{label:'ROAS',data:roas,borderColor:'#6ee7b7',backgroundColor:'rgba(110,231,183,.10)',yAxisID:'y1',tension:.35}]},options:{maintainAspectRatio:false,plugins:{legend:{labels:{color:'#cfe3f0'}}},scales:{x:{ticks:{color:'#9fb3c8'},grid:{color:'rgba(255,255,255,.06)'}},y:{ticks:{color:'#9fb3c8'}},y1:{position:'right',ticks:{color:'#9fb3c8'},grid:{display:false}}}});}
 function ensureTopChart(labels,clicks){const el=$('topChart'); if(!el||!window.Chart) return; if(topChart) topChart.destroy(); topChart=new Chart(el,{type:'bar',data:{labels,datasets:[{label:'Clicks',data:clicks,backgroundColor:'#7c3aed'}]},options:{maintainAspectRatio:false,plugins:{legend:{labels:{color:'#cfe3f0'}}},scales:{x:{ticks:{color:'#9fb3c8'}},y:{ticks:{color:'#9fb3c8'}}}});}
 
+// render
 function renderKPIs(k){$('kpis').innerHTML=[{label:'Total Spend',value:currency(k.total_spend)},{label:'Avg ROAS',value:(k.avg_roas??0).toFixed?.(2)??String(k.avg_roas||0)},{label:'Avg CPA',value:currency(k.avg_cpa)},{label:'Conversions',value:(k.conversions||0).toLocaleString()}].map(x=>`<div class="kpi"><div class="label">${x.label}</div><div class="value">${x.value}</div></div>`).join('');}
 function badge(txt,cls){const klass=cls==='high'?'badge high':cls==='med'?'badge med':cls==='low'?'badge low':'badge';return `<span class="${klass}">${txt}</span>`;}
 function insightCard(i){const sel=selectedForPlan.has(i.id);return `<div class="card" style="margin:10px 0"><div style="display:flex;justify-content:space-between;gap:8px"><div><div style="font-weight:800">${i.title}</div><div class="sub">Campaign: ${i.campaign_name}</div></div><div>${badge(i.kpi,'kpi')} ${badge(i.severity,i.severity)} ${badge('Score '+i.priority_score,'low')}</div></div><div style="margin-top:8px"><b>Why:</b><pre>${JSON.stringify(i.evidence||{},null,2)}</pre></div><div><b>Actions (48h):</b><ul>${(i.actions||[]).map(a=>`<li>${a}</li>`).join('')}</ul></div><div class="sub" style="margin-top:6px">Expected impact: +${Math.round((i.expected_impact||0)*100)}%</div><div style="margin-top:10px"><button class="btn ${sel?'danger':''}" onclick="toggleSelect(${i.id})">${sel?'Remove':'Add'} to Plan</button></div></div>`;}
@@ -45,7 +35,7 @@ function renderPlan(plan){$('planRows').innerHTML=(plan||[]).map(p=>`<tr><td>${p
 function showModal(){document.getElementById('modal').style.display='flex';}
 function hideModal(){document.getElementById('modal').style.display='none';}
 
-// --- data loads ---
+// loads
 async function refreshHealth(){try{const d=await call('/health');showOut(d);}catch(e){showOut(e);}}
 async function seedDemo(){try{const d=await call('/api/seed',{method:'POST'});showOut(d);await loadAll();toast('Seeded');}catch(e){showOut(e);}}
 async function loadKPIs(){try{const k=await call('/api/kpis');renderKPIs(k);}catch(e){showOut(e);}}
@@ -54,10 +44,29 @@ async function loadRecs(){try{const d=await call('/api/insights');renderInsights
 async function loadPosts(){try{const d=await call('/api/posts');$('posts').innerHTML=(d.posts||[]).map(p=>`<div class="badge">${p.platform}</div> ${p.title||''} <span class="sub">· ${p.caption||''}</span>`).join('<br>')||'<div class="sub">No posts yet.</div>';}catch(e){$('posts').innerHTML='<div class="sub">Sign in to load private posts.</div>';}}
 async function pullPosts(){try{const d=await call('/api/social/mock_pull',{method:'POST'});showOut(d);await loadPosts();toast('Demo posts added');}catch(e){showOut(e);}}
 
+// features
 async function generatePlaybook(){try{const body=selectedForPlan.size?{insight_ids:[...selectedForPlan]}:{};const d=await call('/api/playbook',{method:'POST',body:JSON.stringify(body)});showOut(d);renderPlan(d.plan||[]);showModal();}catch(e){showOut(e);}}
 async function askAI(){try{const q=$('aiq').value||'';const d=await call('/api/ai/ask',{method:'POST',body:JSON.stringify({q})});$('aiout').textContent=d.answer||JSON.stringify(d,null,2);}catch(e){$('aiout').textContent='Sign in to use the AI on your posts.';}}
 async function connect(platform){try{const d=await call(`/api/oauth/${platform}`); if(d.auth_url){window.open(d.auth_url,'_blank'); toast('Opened auth (demo URL)');} else {toast('OAuth error');}}catch(e){toast('Sign in to connect');}}
 async function loadConnections(){try{const d=await call('/api/social/connections');$('connections').innerHTML=(d.connections||[]).map(c=>`<span class="badge ${c.connected?'low':''}">${c.platform}${c.connected?' · connected':''}</span>`).join(' ')||'<span class="sub">No connections</span>';}catch(e){$('connections').innerHTML='<span class="sub">Sign in to view connections.</span>'; }}
 
+// contact form
+async function submitContact(){
+  const payload={
+    name:$('c_name').value||'',
+    email:$('c_email').value||'',
+    company:$('c_company').value||'',
+    phone:$('c_phone').value||'',
+    message:$('c_msg').value||''
+  };
+  try{
+    const r=await fetch('/api/contact',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const d=await r.json();
+    if(d.ok){ toast(d.emailed?'Thanks! Message sent.':'Thanks! Saved.'); $('c_msg').value=''; }
+    else { toast('Submit failed'); }
+  }catch(e){ toast('Submit error'); }
+}
+
+// boot
 async function loadAll(){ await Promise.allSettled([refreshAuthBadge(),refreshHealth(),loadKPIs(),loadTrends(),loadRecs(),loadConnections(),loadPosts()]); }
 document.addEventListener('DOMContentLoaded', loadAll);
