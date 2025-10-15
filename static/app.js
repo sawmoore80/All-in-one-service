@@ -11,8 +11,7 @@
     return fetch(path, base).then(function(r){
       return r.text().then(function(txt){
         var d; try{ d=JSON.parse(txt); }catch(_){ d={raw:txt}; }
-        if(!r.ok) throw d;
-        return d;
+        if(!r.ok) throw d; return d;
       });
     });
   }
@@ -108,11 +107,7 @@
   function loadPosts(){
     return call('/api/posts').then(function(d){
       $('posts').innerHTML=(d.posts||[]).map(function(p){ return '<div class="badge">'+p.platform+'</div> '+(p.title||'')+' <span class="sub">· '+(p.caption||'')+'</span>'; }).join('<br>')||'<div class="sub">No posts yet.</div>';
-    }).catch(function(){
-      call('/api/posts_demo').then(function(d){
-        $('posts').innerHTML=(d.posts||[]).map(function(p){ return '<div class="badge">'+p.platform+'</div> '+(p.title||'')+' <span class="sub">· '+(p.caption||'')+'</span>'; }).join('<br>');
-      });
-    });
+    }).catch(function(){ $('posts').innerHTML='<div class="sub">No posts yet.</div>'; });
   }
   function pullPosts(){ return call('/api/social/mock_pull',{method:'POST'}).then(function(d){showOut(d);toast('Demo posts added');return loadPosts();}).catch(showOut); }
 
@@ -152,7 +147,7 @@
       .catch(function(){ toast('Submit error'); });
   }
 
-  // ---- wire buttons by ID ----
+  // ---- wire buttons ----
   function wire(){
     var map = [
       ['btnAccount', openAuth], ['btnCloseAuth', closeAuth],
@@ -168,5 +163,6 @@
   }
 
   function loadAll(){ wire(); Promise.allSettled([refreshAuthBadge(),refreshHealth(),loadKPIs(),loadTrends(),loadRecs(),loadConnections(),loadPosts()]); }
+
   document.addEventListener('DOMContentLoaded', loadAll);
 })();

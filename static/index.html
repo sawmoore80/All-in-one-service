@@ -9,17 +9,23 @@
   <link rel="stylesheet" href="/static/app.css">
 </head>
 <body>
-  <div class="nav">
-    <div class="brand"><span class="dot"></span> AdMind</div>
-    <div class="nav-actions">
-      <span id="authBadge" class="pill">Guest</span>
-      <button id="btnAccount" class="btn">Account</button>
-      <button id="btnHealth" class="btn">Health</button>
-      <button id="btnSeed" class="btn">Seed Demo</button>
-      <button id="btnPull" class="btn">Pull Demo Posts</button>
-      <button id="btnPlan" class="btn primary">7-Day Plan</button>
-      <button id="btnLogout" class="btn danger">Logout</button>
+  <div class="hero">
+    <img src="/static/art.svg" alt="" class="art">
+    <div class="overlay">
+      <div class="logo">AdMind</div>
+      <div class="tag">Premium optimization workspace</div>
     </div>
+  </div>
+
+  <div class="toolbar">
+    <span id="authBadge" class="pill">Guest</span>
+    <div class="spacer"></div>
+    <button id="btnAccount" class="btn">Account</button>
+    <button id="btnHealth" class="btn">Health</button>
+    <button id="btnSeed" class="btn">Seed Demo</button>
+    <button id="btnPull" class="btn">Pull Demo Posts</button>
+    <button id="btnPlan" class="btn primary">7-Day Plan</button>
+    <button id="btnLogout" class="btn danger">Logout</button>
   </div>
 
   <div class="grid">
@@ -30,8 +36,8 @@
 
   <div class="card">
     <h3>Connections</h3>
-    <div id="connections" class="row"></div>
-    <div class="row" style="margin-top:10px;gap:8px">
+    <div id="connections" class="row" style="margin-bottom:8px"></div>
+    <div class="row" style="gap:8px;flex-wrap:wrap">
       <button id="btnIG" class="btn">Connect Instagram</button>
       <button id="btnTT" class="btn">Connect TikTok</button>
       <button id="btnFB" class="btn">Connect Facebook</button>
@@ -86,10 +92,7 @@
   <!-- Account Modal -->
   <div id="authModal" class="modal-backdrop" style="display:none">
     <div class="modal">
-      <div class="head">
-        <h3>Account</h3>
-        <button id="btnCloseAuth" class="close">Close</button>
-      </div>
+      <div class="head"><h3>Account</h3><button id="btnCloseAuth" class="close">Close</button></div>
       <p class="muted">Create an account or sign in to save connections and see your private data.</p>
       <div class="row" style="gap:8px;flex-wrap:wrap">
         <input id="email" placeholder="Email">
@@ -112,6 +115,6 @@
   <div id="toast" class="toast"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" crossorigin="anonymous"></script>
-  <script src="/static/app.js?v=1"></script>
+  <script src="/static/app.js?v=20002"></script>
 </body>
 </html>
