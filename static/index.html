@@ -8,21 +8,18 @@
   <link rel="stylesheet" href="/static/app.css">
 </head>
 <body>
-  <div id="auth" class="auth">
-    <div class="auth-card">
-      <h2>AdMind</h2>
-      <p class="muted">Sign up or log in to connect your social accounts.</p>
-      <input id="email" placeholder="Email">
-      <input id="password" type="password" placeholder="Password">
-      <button class="btn" onclick="register()">Create account</button>
-      <button class="btn primary" onclick="login()">Sign in</button>
-    </div>
-  </div>
-
-  <div id="app" style="display:none">
+  <div class="container">
     <div class="header">
-      <div class="logo"><span class="logo-dot"></span><div><div class="h1">AdMind</div><div class="sub">Premium optimization workspace</div></div></div>
+      <div class="logo">
+        <span class="logo-dot"></span>
+        <div>
+          <div class="h1">AdMind</div>
+          <div class="sub">Premium optimization workspace</div>
+        </div>
+      </div>
       <div class="toolbar">
+        <span id="authBadge" class="badge">Guest</span>
+        <button class="btn" onclick="openAuth()">Account</button>
         <button class="btn" onclick="refreshHealth()">Health</button>
         <button class="btn" onclick="seedDemo()">Seed Demo</button>
         <button class="btn" onclick="pullPosts()">Pull Demo Posts</button>
@@ -34,10 +31,7 @@
     <div class="grid cols-3">
       <div class="card"><h3>KPIs</h3><div id="kpis" class="kpis"></div></div>
       <div class="card"><h3>Spend & ROAS Trend</h3><div class="chart-wrap"><canvas id="trendChart" height="130"></canvas></div></div>
-      <div class="card">
-        <h3>Top Click Drivers</h3>
-        <div class="chart-wrap"><canvas id="topChart" height="130"></canvas></div>
-      </div>
+      <div class="card"><h3>Top Click Drivers</h3><div class="chart-wrap"><canvas id="topChart" height="130"></canvas></div></div>
     </div>
 
     <div class="grid" style="margin-top:16px">
@@ -85,7 +79,29 @@
     </div>
   </div>
 
-  <div id="modal" class="modal-backdrop">
+  <!-- Account Modal -->
+  <div id="authModal" class="modal-backdrop" style="display:none">
+    <div class="modal">
+      <div class="head">
+        <h3>Account</h3>
+        <button class="close" onclick="closeAuth()">Close</button>
+      </div>
+      <div class="auth-card" style="background:transparent;border:none;padding:0;max-width:540px">
+        <p class="muted">Create an account or sign in to save connections and see your private data.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <input id="email" placeholder="Email">
+          <input id="password" type="password" placeholder="Password">
+          <button class="btn" onclick="register()">Create account</button>
+          <button class="btn primary" onclick="login()">Sign in</button>
+        </div>
+        <div style="margin-top:12px">
+          <small class="muted">Connected as: <span id="whoami">guest</span></small>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal" class="modal-backdrop" style="display:none">
     <div class="modal">
       <div class="head"><h3>7-Day Playbook</h3><button class="close" onclick="hideModal()">Close</button></div>
       <table class="table"><thead><tr><th>Day</th><th>Title</th><th>KPI</th><th>Severity</th><th>What to ship</th><th>How to measure</th></tr></thead><tbody id="planRows"></tbody></table>
