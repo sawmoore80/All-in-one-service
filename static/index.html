@@ -19,12 +19,12 @@
       </div>
       <div class="toolbar">
         <span id="authBadge" class="badge">Guest</span>
-        <button class="btn" onclick="openAuth()">Account</button>
-        <button class="btn" onclick="refreshHealth()">Health</button>
-        <button class="btn" onclick="seedDemo()">Seed Demo</button>
-        <button class="btn" onclick="pullPosts()">Pull Demo Posts</button>
-        <button class="btn primary" onclick="generatePlaybook()">7-Day Plan</button>
-        <button class="btn danger" onclick="logout()">Logout</button>
+        <button class="btn" id="btnAccount">Account</button>
+        <button class="btn" id="btnHealth">Health</button>
+        <button class="btn" id="btnSeed">Seed Demo</button>
+        <button class="btn" id="btnPull">Pull Demo Posts</button>
+        <button class="btn primary" id="btnPlan">7-Day Plan</button>
+        <button class="btn danger" id="btnLogout">Logout</button>
       </div>
     </div>
 
@@ -39,10 +39,10 @@
         <h3>Connections</h3>
         <div id="connections" class="conn"></div>
         <div class="conn-buttons">
-          <button class="btn" onclick="connect('instagram')">Connect Instagram</button>
-          <button class="btn" onclick="connect('tiktok')">Connect TikTok</button>
-          <button class="btn" onclick="connect('facebook')">Connect Facebook</button>
-          <button class="btn" onclick="connect('youtube')">Connect YouTube</button>
+          <button class="btn" id="btnIG">Connect Instagram</button>
+          <button class="btn" id="btnTT">Connect TikTok</button>
+          <button class="btn" id="btnFB">Connect Facebook</button>
+          <button class="btn" id="btnYT">Connect YouTube</button>
         </div>
       </div>
 
@@ -50,7 +50,7 @@
         <h3>AI Assistant</h3>
         <div class="ai">
           <input id="aiq" placeholder="Ask about posts, competitors, or what to test next…">
-          <button class="btn primary" onclick="askAI()">Ask</button>
+          <button class="btn primary" id="btnAskAI">Ask</button>
         </div>
         <pre id="aiout">—</pre>
       </div>
@@ -62,8 +62,8 @@
           <h3>Recommendations</h3>
           <div class="sticky-actions">
             <span class="sub">Select to include in plan</span>
-            <button class="btn" onclick="clearSelection()">Clear</button>
-            <button class="btn primary" onclick="generatePlaybook()">Build Plan</button>
+            <button class="btn" id="btnClearSel">Clear</button>
+            <button class="btn primary" id="btnPlan">Build Plan</button>
           </div>
         </div>
         <div id="recs"></div>
@@ -90,7 +90,7 @@
         </div>
         <textarea id="c_msg" placeholder="How can we help?" style="width:100%;margin-top:8px;height:90px;border-radius:10px;border:1px solid #1d2940;background:#0b1322;color:#e6f0ff;padding:10px"></textarea>
         <div style="display:flex;gap:8px;margin-top:8px">
-          <button class="btn" onclick="submitContact()">Submit</button>
+          <button class="btn" id="btnContact">Submit</button>
           <a class="btn primary" href="mailto:sawmoore80@gmail.com?subject=Free%20Quote%20Meeting&body=Hi%20AdMind%2C%20I%27d%20like%20a%20free%20quote.">Book Free Quote</a>
         </div>
       </div>
@@ -121,7 +121,7 @@
 
   <div id="modal" class="modal-backdrop" style="display:none">
     <div class="modal">
-      <div class="head"><h3>7-Day Playbook</h3><button class="close" onclick="hideModal()">Close</button></div>
+      <div class="head"><h3>7-Day Playbook</h3><button class="close" id="btnClosePlan">Close</button></div>
       <table class="table"><thead><tr><th>Day</th><th>Title</th><th>KPI</th><th>Severity</th><th>What to ship</th><th>How to measure</th></tr></thead><tbody id="planRows"></tbody></table>
     </div>
   </div>
@@ -129,7 +129,7 @@
   <div id="toast" class="toast"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" crossorigin="anonymous"></script>
-  <script src="/static/app.js?v=1760552696"></script>
+  <script src="/static/app.js?v=1760553396"></script>
   <!-- v:force -->
 </body>
 </html>

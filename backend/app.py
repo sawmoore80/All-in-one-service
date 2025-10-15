@@ -332,3 +332,25 @@ if "get_trends" not in globals():
 if "get_insights" not in globals():
     @app.get("/api/insights")
     def get_insights(): return {"ok": True,"insights":[]}
+
+# ===== visibility and permissive headers (same-origin safe) =====
+@app.after_request
+def _aug_headers(resp):
+    resp.headers["Cache-Control"] = "no-store"
+    resp.headers["X-AdMind"] = "ok"
+    return resp
+
+# quick test endpoint used by the UI "Health" button
+@app.get("/api/test")
+def api_test():
+    who = getattr(current_user, "email", "guest")
+    return {"ok": True, "message": "AdMind alive", "user": who}
+
+# public demo posts (so the UI shows something even if not logged in)
+@app.get("/api/posts_demo")
+def api_posts_demo():
+    return {"ok": True, "posts": [
+        {"platform":"Instagram","title":"Spring Drop","caption":"New arrivals"},
+        {"platform":"TikTok","title":"Behind the scenes","caption":"BTS shoot"},
+        {"platform":"YouTube","title":"How we scale ROAS","caption":"Case study"}
+    ]}
