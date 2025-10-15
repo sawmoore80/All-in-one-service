@@ -2,46 +2,38 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>AdMind — Performance Command Center</title>
+  <title>AdMind — AI Platform for Ad Agencies</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/app.css">
 </head>
 <body>
-  <div class="container">
+  <div id="auth" class="auth">
+    <div class="auth-card">
+      <h2>AdMind</h2>
+      <p class="muted">Sign up or log in to connect your social accounts.</p>
+      <input id="email" placeholder="Email">
+      <input id="password" type="password" placeholder="Password">
+      <button class="btn" onclick="register()">Create account</button>
+      <button class="btn primary" onclick="login()">Sign in</button>
+    </div>
+  </div>
+
+  <div id="app" style="display:none">
     <div class="header">
-      <div class="logo">
-        <span class="logo-dot"></span>
-        <div>
-          <div class="h1">AdMind</div>
-          <div class="sub">Premium optimization workspace</div>
-        </div>
-      </div>
-      <div style="display:flex;align-items:center;gap:10px">
-        <div id="status" class="status">checking…</div>
-        <div class="toolbar">
-          <button class="btn" onclick="refreshHealth()">Check Health</button>
-          <button class="btn" onclick="seedDemo()">Seed Demo</button>
-          <button class="btn primary" onclick="generatePlaybook()">Generate 7-Day Plan</button>
-        </div>
+      <div class="logo"><span class="logo-dot"></span><div><div class="h1">AdMind</div><div class="sub">Premium optimization workspace</div></div></div>
+      <div class="toolbar">
+        <button class="btn" onclick="refreshHealth()">Health</button>
+        <button class="btn" onclick="seedDemo()">Seed Demo</button>
+        <button class="btn" onclick="pullPosts()">Pull Demo Posts</button>
+        <button class="btn primary" onclick="generatePlaybook()">7-Day Plan</button>
+        <button class="btn danger" onclick="logout()">Logout</button>
       </div>
     </div>
 
     <div class="grid cols-3">
-      <div class="card">
-        <h3>KPIs</h3>
-        <div id="kpis" class="kpis">
-          <div class="kpi skel" style="height:70px"></div>
-          <div class="kpi skel" style="height:70px"></div>
-          <div class="kpi skel" style="height:70px"></div>
-          <div class="kpi skel" style="height:70px"></div>
-        </div>
-      </div>
-      <div class="card">
-        <h3>Spend & ROAS Trend</h3>
-        <div class="chart-wrap"><canvas id="trendChart" height="130"></canvas></div>
-      </div>
+      <div class="card"><h3>KPIs</h3><div id="kpis" class="kpis"></div></div>
+      <div class="card"><h3>Spend & ROAS Trend</h3><div class="chart-wrap"><canvas id="trendChart" height="130"></canvas></div></div>
       <div class="card">
         <h3>Top Click Drivers</h3>
         <div class="chart-wrap"><canvas id="topChart" height="130"></canvas></div>
@@ -50,25 +42,42 @@
 
     <div class="grid" style="margin-top:16px">
       <div class="card">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-          <h3 style="margin:0">Recommendations</h3>
-          <div class="sticky-actions">
-            <span class="sub">Select items to include in plan</span>
-            <button class="btn" onclick="clearSelection()">Clear Selection</button>
-            <button class="btn primary" onclick="generatePlaybook()">Build Plan</button>
-          </div>
-        </div>
-        <div id="recs">
-          <div class="insight">
-            <div class="left" style="width:100%">
-              <div class="skel" style="height:18px;border-radius:8px;width:50%"></div>
-              <div class="skel" style="height:12px;border-radius:8px;width:30%;margin-top:8px"></div>
-              <div class="skel" style="height:80px;border-radius:10px;margin-top:8px"></div>
-            </div>
-          </div>
+        <h3>Connections</h3>
+        <div id="connections" class="conn"></div>
+        <div class="conn-buttons">
+          <button class="btn" onclick="connect('instagram')">Connect Instagram</button>
+          <button class="btn" onclick="connect('tiktok')">Connect TikTok</button>
+          <button class="btn" onclick="connect('facebook')">Connect Facebook</button>
+          <button class="btn" onclick="connect('youtube')">Connect YouTube</button>
         </div>
       </div>
 
+      <div class="card">
+        <h3>AI Assistant</h3>
+        <div class="ai">
+          <input id="aiq" placeholder="Ask about posts, competitors, or what to test next…">
+          <button class="btn primary" onclick="askAI()">Ask</button>
+        </div>
+        <pre id="aiout">—</pre>
+      </div>
+    </div>
+
+    <div class="grid" style="margin-top:16px">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <h3>Recommendations</h3>
+          <div class="sticky-actions">
+            <span class="sub">Select to include in plan</span>
+            <button class="btn" onclick="clearSelection()">Clear</button>
+            <button class="btn primary" onclick="generatePlaybook()">Build Plan</button>
+          </div>
+        </div>
+        <div id="recs"></div>
+      </div>
+      <div class="card">
+        <h3>Posts</h3>
+        <div id="posts"></div>
+      </div>
       <div class="card">
         <h3>API Output</h3>
         <pre id="out">—</pre>
@@ -76,22 +85,14 @@
     </div>
   </div>
 
-  <div id="toast" class="toast"></div>
-
-  <div id="modal" class="modal-backdrop" role="dialog" aria-modal="true">
+  <div id="modal" class="modal-backdrop">
     <div class="modal">
-      <div class="head">
-        <h3>7-Day Playbook</h3>
-        <button class="close" onclick="hideModal()">Close</button>
-      </div>
-      <div id="planWrap">
-        <table class="table">
-          <thead><tr><th>Day</th><th>Title</th><th>KPI</th><th>Severity</th><th>What to ship</th><th>How to measure</th></tr></thead>
-          <tbody id="planRows"></tbody>
-        </table>
-      </div>
+      <div class="head"><h3>7-Day Playbook</h3><button class="close" onclick="hideModal()">Close</button></div>
+      <table class="table"><thead><tr><th>Day</th><th>Title</th><th>KPI</th><th>Severity</th><th>What to ship</th><th>How to measure</th></tr></thead><tbody id="planRows"></tbody></table>
     </div>
   </div>
+
+  <div id="toast" class="toast"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" crossorigin="anonymous"></script>
   <script src="/static/app.js"></script>
