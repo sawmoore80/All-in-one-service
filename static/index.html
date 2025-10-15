@@ -2,75 +2,98 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>AdMind</title>
+  <title>AdMind — Performance Command Center</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <style>
-    :root{--bg:#0b0f14;--card:#121821;--muted:#8aa0b2;--accent:#4ea8ff}
-    body{font-family:Inter,Arial,sans-serif;margin:28px;color:#e8eef4;background:#0b0f14}
-    h1{margin:0 0 8px 0;font-size:40px}
-    .bar{margin:10px 0 20px 0}
-    .btn{padding:10px 14px;border-radius:8px;border:1px solid #2b3a49;background:#17202b;color:#e8eef4;margin-right:10px;cursor:pointer}
-    .btn:hover{background:#1a2633}
-    .section-title{font-size:22px;margin:24px 0 10px 0}
-    .card{background:var(--card);border:1px solid #223142;border-radius:12px;padding:14px;margin:8px 0}
-    pre{background:#0f141b;border:1px solid #1e2a36;border-radius:10px;padding:12px;overflow:auto}
-    table{width:100%;border-collapse:collapse;color:#e8eef4}
-    th,td{padding:10px;border-bottom:1px solid #1f2b39;font-size:14px}
-    th{color:#9fb3c8;text-align:left}
-    .kpis{display:grid;grid-template-columns:repeat(4,minmax(180px,1fr));gap:12px;margin:10px 0}
-    .kpi{background:#121a23;border:1px solid #203040;border-radius:12px;padding:14px}
-    .kpi .label{color:#9fb3c8;font-size:12px}
-    .kpi .value{font-size:22px;font-weight:700}
-    .kpi .sub{color:#8aa0b2;font-size:12px}
-    .rec{padding:12px;border-bottom:1px solid #1f2b39}
-    .rec-title{font-weight:700}
-    .grid{display:grid;grid-template-columns:1fr;gap:8px}
-    @media(min-width:900px){.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}}
-  </style>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/app.css">
 </head>
 <body>
-  <h1>AdMind</h1>
-  <div>Status: <strong id="status">checking…</strong></div>
-  <div class="bar">
-    <button class="btn" onclick="refreshHealth()">Check Health</button>
-    <button class="btn" onclick="seedDemo()">Seed Demo Data</button>
+  <div class="container">
+    <div class="header">
+      <div class="logo">
+        <span class="logo-dot"></span>
+        <div>
+          <div class="h1">AdMind</div>
+          <div class="sub">Premium optimization workspace</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div id="status" class="status">checking…</div>
+        <div class="toolbar">
+          <button class="btn" onclick="refreshHealth()">Check Health</button>
+          <button class="btn" onclick="seedDemo()">Seed Demo</button>
+          <button class="btn primary" onclick="generatePlaybook()">Generate 7-Day Plan</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid cols-3">
+      <div class="card">
+        <h3>KPIs</h3>
+        <div id="kpis" class="kpis">
+          <div class="kpi skel" style="height:70px"></div>
+          <div class="kpi skel" style="height:70px"></div>
+          <div class="kpi skel" style="height:70px"></div>
+          <div class="kpi skel" style="height:70px"></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Spend & ROAS Trend</h3>
+        <div class="chart-wrap"><canvas id="trendChart" height="130"></canvas></div>
+      </div>
+      <div class="card">
+        <h3>Top Click Drivers</h3>
+        <div class="chart-wrap"><canvas id="topChart" height="130"></canvas></div>
+      </div>
+    </div>
+
+    <div class="grid" style="margin-top:16px">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <h3 style="margin:0">Recommendations</h3>
+          <div class="sticky-actions">
+            <span class="sub">Select items to include in plan</span>
+            <button class="btn" onclick="clearSelection()">Clear Selection</button>
+            <button class="btn primary" onclick="generatePlaybook()">Build Plan</button>
+          </div>
+        </div>
+        <div id="recs">
+          <div class="insight">
+            <div class="left" style="width:100%">
+              <div class="skel" style="height:18px;border-radius:8px;width:50%"></div>
+              <div class="skel" style="height:12px;border-radius:8px;width:30%;margin-top:8px"></div>
+              <div class="skel" style="height:80px;border-radius:10px;margin-top:8px"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>API Output</h3>
+        <pre id="out">—</pre>
+      </div>
+    </div>
   </div>
 
-  <div class="section-title">Overview</div>
-  <div class="kpis" id="kpis"></div>
+  <div id="toast" class="toast"></div>
 
-  <div class="grid2">
-    <div class="card"><canvas id="trendChart" height="140"></canvas></div>
-    <div class="card"><canvas id="topChart" height="140"></canvas></div>
+  <div id="modal" class="modal-backdrop" role="dialog" aria-modal="true">
+    <div class="modal">
+      <div class="head">
+        <h3>7-Day Playbook</h3>
+        <button class="close" onclick="hideModal()">Close</button>
+      </div>
+      <div id="planWrap">
+        <table class="table">
+          <thead><tr><th>Day</th><th>Title</th><th>KPI</th><th>Severity</th><th>What to ship</th><th>How to measure</th></tr></thead>
+          <tbody id="planRows"></tbody>
+        </table>
+      </div>
+    </div>
   </div>
 
-  <div class="section-title">Recommendations <button class="btn" onclick="generatePlaybook()">Generate 7-Day Plan</button></div><div id="recs"></div>
-
-  <div class="section-title">Accounts</div>
-  <div class="card"><table>
-    <thead><tr><th>ID</th><th>Name</th><th>Platform</th><th>Monthly Spend</th></tr></thead>
-    <tbody id="accounts"></tbody>
-  </table></div>
-
-  <div class="section-title">Campaigns</div>
-  <div class="card"><table>
-    <thead>
-      <tr>
-        <th>ID</th><th>Account</th><th>Name</th><th>Status</th>
-        <th>Spend</th><th>CPA</th><th>ROAS</th><th>CTR</th>
-        <th>Impressions</th><th>Clicks</th><th>Conversions</th>
-      </tr>
-    </thead>
-    <tbody id="campaigns"></tbody>
-  </table></div>
-
-  <div class="section-title">API Output</div>
-  <div class="card"><pre id="out">{}</pre></div>
-
-  <script src="/static/app.js?v=6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" crossorigin="anonymous"></script>
+  <script src="/static/app.js"></script>
 </body>
 </html>

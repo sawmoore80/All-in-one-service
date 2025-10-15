@@ -1,105 +1,155 @@
-const API = ""; const $ = id => document.getElementById(id);
+const API = ""; const $ = (id)=>document.getElementById(id);
 let trendChart, topChart;
+let selectedForPlan = new Set();
 
-async function call(path, opts={}) {
-  const r = await fetch(`${API}${path}`, { headers:{'Content-Type':'application/json'}, ...opts });
-  if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
-  return r.json();
+function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2200); }
+function setStatus(ok){ const s=$('status'); if(ok){s.textContent='healthy'; s.className='status ok';} else {s.textContent='error'; s.className='status err';} }
+function showOut(obj){ $('out').textContent = typeof obj==='string'? obj : JSON.stringify(obj,null,2); }
+
+async function call(path, opts={}){
+  const r = await fetch(`${API}${path}`, {headers:{'Content-Type':'application/json'}, ...opts});
+  const txt = await r.text();
+  let data; try{ data = JSON.parse(txt);}catch{ data = {raw:txt}; }
+  if(!r.ok) throw Object.assign(new Error(`HTTP ${r.status}`), {status:r.status, data});
+  return data;
 }
-function currency(n){ return '$'+(n||0).toLocaleString(undefined,{maximumFractionDigits:0}); }
 
-async function refreshHealth(){
-  try{ const d=await call('/health'); $('status').textContent=d.ok?'healthy':'error'; $('out').textContent=JSON.stringify(d,null,2);}
-  catch(e){ $('status').textContent='error'; $('out').textContent=e.toString(); }
-}
-async function seedDemo(){ $('out').textContent='Seeding…'; const d=await call('/api/seed',{method:'POST'}); $('out').textContent=JSON.stringify(d,null,2); await loadAll(); }
+// Global error surfacing
+window.addEventListener('error', e=>{ setStatus(false); showOut(String(e.error||e.message||e)); });
+window.addEventListener('unhandledrejection', e=>{ setStatus(false); showOut(e.reason||'Promise rejected'); });
 
+// ---------- KPIs ----------
+function currency(n){return '$'+(Number(n)||0).toLocaleString(undefined,{maximumFractionDigits:0});}
 function renderKPIs(k){
-  $('kpis').innerHTML = [
-    {label:'Total Spend',value:currency(k.total_spend)},
-    {label:'Avg ROAS',value:(k.avg_roas||0).toFixed(2)},
-    {label:'Avg CPA',value:currency(k.avg_cpa)},
-    {label:'Conversions',value:(k.conversions||0).toLocaleString()}
-  ].map(x=>`<div class="kpi"><div class="label">${x.label}</div><div class="value">${x.value}</div></div>`).join('');
+  const items = [
+    {label:'Total Spend', value:currency(k.total_spend)},
+    {label:'Avg ROAS',   value:(k.avg_roas??0).toFixed?.(2) ?? String(k.avg_roas||0)},
+    {label:'Avg CPA',    value:currency(k.avg_cpa)},
+    {label:'Conversions',value:(k.conversions||0).toLocaleString()},
+  ];
+  $('kpis').innerHTML = items.map(x=>`
+    <div class="kpi"><div class="label">${x.label}</div><div class="value">${x.value}</div></div>
+  `).join('');
 }
-function ensureTrendChart(labels,spend,roas){
+
+// ---------- Charts ----------
+function ensureTrendChart(labels, spend, roas){
+  const el = $('trendChart'); if(!el || !window.Chart) return;
   if(trendChart) trendChart.destroy();
-  trendChart=new Chart($('trendChart'),{type:'line',data:{labels,
-    datasets:[
-      {label:'Spend',data:spend,borderColor:'#4ea8ff',backgroundColor:'rgba(78,168,255,.15)',yAxisID:'y',tension:.35},
-      {label:'ROAS',data:roas,borderColor:'#6ee7b7',backgroundColor:'rgba(110,231,183,.12)',yAxisID:'y1',tension:.35}
+  trendChart = new Chart(el, {
+    type:'line',
+    data:{labels, datasets:[
+      {label:'Spend', data:spend, borderColor:'#4ea8ff', backgroundColor:'rgba(78,168,255,.12)', yAxisID:'y', tension:.35},
+      {label:'ROAS', data:roas, borderColor:'#6ee7b7', backgroundColor:'rgba(110,231,183,.10)', yAxisID:'y1', tension:.35},
     ]},
-    options:{plugins:{legend:{labels:{color:'#cfe3f0'}}},scales:{x:{ticks:{color:'#9fb3c8'},grid:{color:'rgba(255,255,255,.06)'}},y:{ticks:{color:'#9fb3c8'}},y1:{position:'right',ticks:{color:'#9fb3c8'},grid:{display:false}}}}
+    options:{
+      maintainAspectRatio:false, plugins:{legend:{labels:{color:'#cfe3f0'}}},
+      scales:{x:{ticks:{color:'#9fb3c8'}, grid:{color:'rgba(255,255,255,.06)'}},
+              y:{ticks:{color:'#9fb3c8'}}, y1:{position:'right', ticks:{color:'#9fb3c8'}, grid:{display:false}}}
+    }
   });
 }
-function ensureTopChart(labels,clicks){
+function ensureTopChart(labels, clicks){
+  const el = $('topChart'); if(!el || !window.Chart) return;
   if(topChart) topChart.destroy();
-  topChart=new Chart($('topChart'),{type:'bar',data:{labels,datasets:[{label:'Clicks',data:clicks,backgroundColor:'#7c3aed'}]},options:{plugins:{legend:{labels:{color:'#cfe3f0'}}},scales:{x:{ticks:{color:'#9fb3c8'}},y:{ticks:{color:'#9fb3c8'}}}});
+  topChart = new Chart(el, {
+    type:'bar',
+    data:{labels, datasets:[{label:'Clicks', data:clicks, backgroundColor:'#7c3aed'}]},
+    options:{maintainAspectRatio:false, plugins:{legend:{labels:{color:'#cfe3f0'}}},
+      scales:{x:{ticks:{color:'#9fb3c8'}}, y:{ticks:{color:'#9fb3c8'}}}}
+  });
 }
 
-function badge(txt, cls){ const c = cls==='high'?'#ef4444':cls==='med'?'#f59e0b':'#10b981'; return `<span style="display:inline-block;padding:2px 8px;border-radius:999px;background:${c}22;border:1px solid ${c}33;color:${c};font-size:12px;margin-right:6px">${txt}</span>`; }
-
-function renderTable(el, rows, cols){
-  if(!rows?.length){ el.innerHTML='<div style="color:#9fb3c8">No data</div>'; return; }
-  el.innerHTML = `<table><thead><tr>${cols.map(c=>`<th>${c.label}</th>`).join('')}</tr></thead>
-    <tbody>${rows.map(r=>`<tr>${cols.map(c=>`<td>${r[c.key] ?? ''}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+// ---------- Insights ----------
+function badge(txt, cls){
+  const klass = cls==='high' ? 'badge high' : cls==='med' ? 'badge med' : cls==='low' ? 'badge low' : 'badge';
+  return `<span class="${klass}">${txt}</span>`;
 }
-
+function insightCard(i){
+  const selected = selectedForPlan.has(i.id);
+  return `
+    <div class="insight card" style="margin:10px 0; border:1px solid var(--line)">
+      <div class="left">
+        <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">
+          <div>
+            <div style="font-weight:800;font-size:16px">${i.title}</div>
+            <div class="sub" style="margin-top:4px">Campaign: ${i.campaign_name}</div>
+          </div>
+          <div class="badges">
+            ${badge(i.kpi,'kpi')}
+            ${badge(i.severity, i.severity)}
+            ${badge('Score '+(i.priority_score??'-'),'low')}
+          </div>
+        </div>
+        <div style="margin-top:8px"><b>Why:</b>
+          <pre>${JSON.stringify(i.evidence||{},null,2)}</pre>
+        </div>
+        <div class="actions"><b>Actions (next 48h):</b>
+          <ul>${(i.actions||[]).map(a=>`<li>${a}</li>`).join('')}</ul>
+        </div>
+        <div class="sub" style="margin-top:6px">Expected impact: +${Math.round((i.expected_impact||0)*100)}%</div>
+        <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap">
+          <button class="btn ${selected?'danger':''}" onclick="toggleSelect(${i.id})">${selected?'Remove from':'Add to'} Plan</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
 function renderInsights(list){
-  if(!list?.length){ $('recs').innerHTML='<div class="card">No insights yet</div>'; return; }
-  $('recs').innerHTML = list.map(i=>`
-    <div class="card" style="margin:8px 0">
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <div style="font-weight:700">${i.title}</div>
-        <div>${badge(i.kpi,'low')}${badge(i.severity,i.severity)}${badge('Score '+i.priority_score,'low')}</div>
-      </div>
-      <div style="color:#9fb3c8;margin-top:6px">Campaign: ${i.campaign_name}</div>
-      <div style="margin-top:8px">
-        <div style="font-weight:600;color:#cfe3f0">Why:</div>
-        <pre style="margin:6px 0 10px 0">${JSON.stringify(i.evidence,null,2)}</pre>
-        <div style="font-weight:600;color:#cfe3f0">Actions (next 48h):</div>
-        <ul>${i.actions.map(a=>`<li>${a}</li>`).join('')}</ul>
-      </div>
-      <div style="margin-top:6px;color:#9fb3c8">Expected impact: +${Math.round(i.expected_impact*100)}%</div>
-      <div style="margin-top:10px">
-        <button class="btn" onclick="addToPlan(${i.id})">Add to 7-Day Plan</button>
-      </div>
-    </div>`).join('');
+  if(!Array.isArray(list) || !list.length){
+    $('recs').innerHTML = '<div class="sub">No insights yet.</div>'; return;
+  }
+  $('recs').innerHTML = list.map(insightCard).join('');
+}
+function toggleSelect(id){
+  if(selectedForPlan.has(id)){ selectedForPlan.delete(id); toast('Removed from plan'); }
+  else { selectedForPlan.add(id); toast('Added to plan'); }
+  // re-render selection state quickly
+  loadRecs();
+}
+function clearSelection(){ selectedForPlan.clear(); loadRecs(); toast('Selection cleared'); }
+
+// ---------- Playbook Modal ----------
+function showModal(){ $('modal').style.display='flex'; }
+function hideModal(){ $('modal').style.display='none'; }
+function renderPlan(plan){
+  const rows = plan.map(p=>`
+    <tr>
+      <td>${p.day}</td>
+      <td>${p.title}</td>
+      <td>${p.kpi}</td>
+      <td>${p.severity}</td>
+      <td><ul>${p.what_to_ship.map(x=>`<li>${x}</li>`).join('')}</ul></td>
+      <td><ul>${p.how_to_measure.map(x=>`<li>${x}</li>`).join('')}</ul></td>
+    </tr>`).join('');
+  $('planRows').innerHTML = rows || `<tr><td colspan="6" class="sub">No items</td></tr>`;
 }
 
-let selectedForPlan = new Set();
-function addToPlan(id){ selectedForPlan.add(id); $('out').textContent = JSON.stringify({selected:[...selectedForPlan]},null,2); }
+// ---------- API Loads ----------
+async function refreshHealth(){
+  try{ const d=await call('/health'); setStatus(!!d.ok); showOut(d); }
+  catch(e){ setStatus(false); showOut(e.data||String(e)); }
+}
+async function seedDemo(){
+  try{ showOut('Seeding…'); const d=await call('/api/seed',{method:'POST'}); showOut(d); await loadAll(); toast('Demo data seeded'); }
+  catch(e){ setStatus(false); showOut(e.data||String(e)); }
+}
+async function loadKPIs(){ try{ const k=await call('/api/kpis'); renderKPIs(k); } catch(e){ showOut(e.data||String(e)); } }
+async function loadTrends(){ 
+  try{ const t=await call('/api/trends'); ensureTrendChart(t.labels,t.series?.spend||[],t.series?.roas||[]); ensureTopChart(t.top?.labels||[],t.top?.clicks||[]); }
+  catch(e){ showOut(e.data||String(e)); }
+}
+async function loadRecs(){ try{ const d=await call('/api/insights'); renderInsights(d.insights||[]); } catch(e){ showOut(e.data||String(e)); } }
 
 async function generatePlaybook(){
-  const body = selectedForPlan.size? {insight_ids:[...selectedForPlan]} : {};
-  const d = await call('/api/playbook',{method:'POST',body:JSON.stringify(body)});
-  $('out').textContent = JSON.stringify(d, null, 2);
+  try{
+    const body = selectedForPlan.size ? {insight_ids:[...selectedForPlan]} : {};
+    const d = await call('/api/playbook',{method:'POST',body:JSON.stringify(body)});
+    showOut(d);
+    renderPlan(d.plan||[]);
+    showModal();
+  }catch(e){ setStatus(false); showOut(e.data||String(e)); }
 }
+async function loadAll(){ await Promise.allSettled([refreshHealth(), loadKPIs(), loadTrends(), loadRecs()]); }
 
-async function loadRecs(){ const d=await call('/api/insights'); renderInsights(d.insights||[]); }
-async function loadAccounts(){ const d=await call('/api/accounts'); renderTable($('accounts'), d.accounts||[], [{key:'id',label:'ID'},{key:'name',label:'Name'},{key:'platform',label:'Platform'},{key:'monthly_spend',label:'Monthly Spend'}]); }
-async function loadCampaigns(){ const d=await call('/api/campaigns'); renderTable($('campaigns'), d.campaigns||[], [{key:'id',label:'ID'},{key:'account_id',label:'Account'},{key:'name',label:'Name'},{key:'status',label:'Status'},{key:'spend',label:'Spend'},{key:'cpa',label:'CPA'},{key:'roas',label:'ROAS'},{key:'ctr',label:'CTR'},{key:'impressions',label:'Impressions'},{key:'clicks',label:'Clicks'},{key:'conversions',label:'Conversions'}]); }
-
-async function loadKPIs(){ const k=await call('/api/kpis'); $('kpis').innerHTML = [
-  {label:'Total Spend',value:currency(k.total_spend)},
-  {label:'Avg ROAS',value:(k.avg_roas||0).toFixed(2)},
-  {label:'Avg CPA',value:currency(k.avg_cpa)},
-  {label:'Conversions',value:(k.conversions||0).toLocaleString()}
-].map(x=>`<div class="kpi"><div class="label">${x.label}</div><div class="value">${x.value}</div></div>`).join(''); }
-
-async function loadTrends(){ const t=await call('/api/trends'); 
-  if (window.Chart){ 
-    if($('trendChart')){ new Chart($('trendChart')).destroy?.(); }
-    if($('topChart')){ new Chart($('topChart')).destroy?.(); }
-  }
-  ensureTrendChart(t.labels,t.series.spend,t.series.roas); 
-  ensureTopChart(t.top.labels,t.top.clicks); 
-}
-
-async function loadAll(){ await refreshHealth(); await Promise.all([loadKPIs(),loadTrends(),loadRecs(),loadAccounts(),loadCampaigns()]); }
 document.addEventListener('DOMContentLoaded', loadAll);
-
-// expose
-window.refreshHealth = refreshHealth;
-window.seedDemo = seedDemo;
-window.generatePlaybook = generatePlaybook;
