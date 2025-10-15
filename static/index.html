@@ -1,16 +1,14 @@
 <!doctype html>
 <html>
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>AdMind — Premium Optimization</title>
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>AdMind – Premium Optimization</title>
   <link rel="stylesheet" href="/static/app.css">
 </head>
 <body>
   <div class="hero">
-    <img src="/static/art.svg" alt="" class="art">
+    <img src="/static/art.svg" class="art" alt="decor"/>
     <div class="overlay">
       <div class="logo">AdMind</div>
       <div class="tag">Premium optimization workspace</div>
@@ -19,37 +17,37 @@
 
   <div class="toolbar">
     <span id="authBadge" class="pill">Guest</span>
+    <button id="btnAccount" class="btn" onclick="openAuth()">Account</button>
+    <button id="btnHealth" class="btn" onclick="refreshHealth()">Health</button>
+    <button id="btnSeed" class="btn" onclick="seedDemo()">Seed Demo</button>
+    <button id="btnPull" class="btn" onclick="pullPosts()">Pull Demo Posts</button>
+    <button id="btnPlan" class="btn primary" onclick="generatePlaybook()">7-Day Plan</button>
     <div class="spacer"></div>
-    <button id="btnAccount" onclick="openAuth()">Account/button>
-    <button id="btnHealth" onclick="refreshHealth()">Health/button>
-    <button id="btnSeed" onclick="seedDemo()">Seed Demo/button>
-    <button id="btnPull" onclick="pullPosts()">Pull Demo Posts/button>
-    <button id="btnPlan" onclick="generatePlaybook()">7-Day Plan/button>
-    <button id="btnLogout" onclick="logout()">Logout/button>
+    <button id="btnLogout" class="btn danger" onclick="logout()">Logout</button>
   </div>
 
   <div class="grid">
     <div class="card"><h3>KPIs</h3><div id="kpis" class="kpis"></div></div>
-    <div class="card"><h3>Spend & ROAS Trend</h3><canvas id="trendChart" height="180"></canvas></div>
-    <div class="card"><h3>Top Click Drivers</h3><canvas id="topChart" height="180"></canvas></div>
+    <div class="card"><h3>Spend & ROAS Trend</h3><div style="height:220px"><canvas id="trendChart"></canvas></div></div>
+    <div class="card"><h3>Top Click Drivers</h3><div style="height:220px"><canvas id="topChart"></canvas></div></div>
   </div>
 
   <div class="card">
     <h3>Connections</h3>
-    <div id="connections" class="row" style="margin-bottom:8px"></div>
+    <div id="connections" class="row" style="margin:8px 0 12px"></div>
     <div class="row" style="gap:8px;flex-wrap:wrap">
-      <button id="btnIG" onclick="connect('instagram')">Connect Instagram/button>
-      <button id="btnTT" onclick="connect('tiktok')">Connect TikTok/button>
-      <button id="btnFB" onclick="connect('facebook')">Connect Facebook/button>
-      <button id="btnYT" onclick="connect('youtube')">Connect YouTube/button>
+      <button id="btnIG" class="btn" onclick="connect('instagram')">Connect Instagram</button>
+      <button id="btnTT" class="btn" onclick="connect('tiktok')">Connect TikTok</button>
+      <button id="btnFB" class="btn" onclick="connect('facebook')">Connect Facebook</button>
+      <button id="btnYT" class="btn" onclick="connect('youtube')">Connect YouTube</button>
     </div>
   </div>
 
   <div class="card">
     <h3>AI Assistant</h3>
-    <div class="ai">
-      <input id="aiq" placeholder="Ask about posts, competitors, or what to test next…">
-      <button id="btnAskAI" onclick="askAI()">Ask/button>
+    <div class="row">
+      <input id="aiq" placeholder="Ask about posts, competitors, or what to test next…" style="flex:1">
+      <button id="btnAskAI" class="btn primary" onclick="askAI()">Ask</button>
     </div>
     <pre id="aiout">—</pre>
   </div>
@@ -59,46 +57,26 @@
       <h3>Recommendations</h3>
       <div class="row">
         <span class="sub">Select to include in plan</span>
-        <button id="btnClearSel" onclick="clearSelection()">Clear/button>
-        <button id="btnPlan2" onclick="generatePlaybook()">Build Plan/button>
+        <button id="btnClearSel" class="btn" onclick="clearSelection()">Clear</button>
+        <button id="btnPlan2" class="btn primary" onclick="generatePlaybook()">Build Plan</button>
       </div>
     </div>
     <div id="recs"></div>
   </div>
 
-  <div class="card">
-    <h3>Posts</h3>
-    <div id="posts"></div>
-  </div>
-
-  <div class="card">
-    <h3>Contact Us</h3>
-    <div class="sub">Call: <b>203-448-8241</b></div>
-    <div class="row" style="margin-top:8px;gap:8px;flex-wrap:wrap">
-      <input id="c_name" placeholder="Your name">
-      <input id="c_email" placeholder="Your email">
-      <input id="c_company" placeholder="Company">
-      <input id="c_phone" placeholder="Phone">
-    </div>
-    <textarea id="c_msg" placeholder="How can we help?"></textarea>
-    <div class="row" style="gap:8px">
-      <button id="btnContact" onclick="submitContact()">Submit/button>
-      <a class="btn primary" href="mailto:sawmoore80@gmail.com?subject=Free%20Quote&body=Hi%20AdMind%2C%20I%27d%20like%20a%20free%20quote.">Book Free Quote</a>
-    </div>
-  </div>
-
+  <div class="card"><h3>Posts</h3><div id="posts"></div></div>
   <div class="card"><h3>API Output</h3><pre id="out">—</pre></div>
 
   <!-- Account Modal -->
   <div id="authModal" class="modal-backdrop" style="display:none">
     <div class="modal">
-      <div class="head"><h3>Account</h3><button id="btnCloseAuth" onclick="closeAuth()">Close/button></div>
+      <div class="head"><h3>Account</h3><button id="btnCloseAuth" class="close" onclick="closeAuth()">Close</button></div>
       <p class="muted">Create an account or sign in to save connections and see your private data.</p>
       <div class="row" style="gap:8px;flex-wrap:wrap">
         <input id="email" placeholder="Email">
         <input id="password" type="password" placeholder="Password">
-        <button id="btnDoRegister" class="btn">Create account</button>
-        <button id="btnDoLogin" class="btn primary">Sign in</button>
+        <button id="btnDoRegister" class="btn" onclick="register()">Create account</button>
+        <button id="btnDoLogin" class="btn primary" onclick="login()">Sign in</button>
       </div>
       <div style="margin-top:10px"><small class="muted">Connected as: <span id="whoami">guest</span></small></div>
     </div>
@@ -107,7 +85,7 @@
   <!-- Plan Modal -->
   <div id="modal" class="modal-backdrop" style="display:none">
     <div class="modal">
-      <div class="head"><h3>7-Day Playbook</h3><button id="btnClosePlan" onclick="hideModal()">Close/button></div>
+      <div class="head"><h3>7-Day Playbook</h3><button id="btnClosePlan" class="close" onclick="hideModal()">Close</button></div>
       <table class="table"><thead><tr><th>Day</th><th>Title</th><th>KPI</th><th>Severity</th><th>What to ship</th><th>How to measure</th></tr></thead><tbody id="planRows"></tbody></table>
     </div>
   </div>
@@ -115,6 +93,6 @@
   <div id="toast" class="toast"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" crossorigin="anonymous"></script>
-  <script src="/static/app.js?v=1760557385"></script>
+  <script src="/static/app.js?v=10001"></script>
 </body>
 </html>
