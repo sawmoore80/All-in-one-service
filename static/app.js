@@ -17,7 +17,7 @@
     });
   }
 
-  // ----- auth -----
+  // ---- auth ----
   function openAuth(){ var m=$('authModal'); if(m) m.style.display='flex'; }
   function closeAuth(){ var m=$('authModal'); if(m) m.style.display='none'; }
   function refreshAuthBadge(){
@@ -40,22 +40,19 @@
       .then(function(){ closeAuth(); loadAll(); })
       .catch(function(e){ toast((e&&e.error)||'Login error'); showOut(e); });
   }
-  function logout(){
-    call('/api/logout').then(function(){ toast('Signed out'); return refreshAuthBadge(); })
-      .catch(function(){ toast('Logout error'); });
-  }
+  function logout(){ call('/api/logout').then(function(){ toast('Signed out'); return refreshAuthBadge(); }); }
 
-  // ----- charts & render -----
+  // ---- charts/render ----
   function currency(n){ return '$'+(Number(n)||0).toLocaleString(undefined,{maximumFractionDigits:0}); }
   function ensureTrendChart(labels,spend,roas){
-    var el=$('trendChart'); if(!el || !window.Chart) return;
+    var el=$('trendChart'); if(!el||!window.Chart) return;
     if(trendChart) trendChart.destroy();
     trendChart=new Chart(el,{type:'line',data:{labels:labels,datasets:[
       {label:'Spend',data:spend,borderColor:'#4ea8ff',backgroundColor:'rgba(78,168,255,.12)',yAxisID:'y',tension:.35},
       {label:'ROAS',data:roas,borderColor:'#6ee7b7',backgroundColor:'rgba(110,231,183,.10)',yAxisID:'y1',tension:.35}
     ]},options:{maintainAspectRatio:false,plugins:{legend:{labels:{color:'#cfe3f0'}}},scales:{x:{ticks:{color:'#9fb3c8'},grid:{color:'rgba(255,255,255,.06)'}},y:{ticks:{color:'#9fb3c8'}},y1:{position:'right',ticks:{color:'#9fb3c8'},grid:{display:false}}}});}
   function ensureTopChart(labels,clicks){
-    var el=$('topChart'); if(!el || !window.Chart) return;
+    var el=$('topChart'); if(!el||!window.Chart) return;
     if(topChart) topChart.destroy();
     topChart=new Chart(el,{type:'bar',data:{labels:labels,datasets:[{label:'Clicks',data:clicks,backgroundColor:'#7c3aed'}]},options:{maintainAspectRatio:false,plugins:{legend:{labels:{color:'#cfe3f0'}}},scales:{x:{ticks:{color:'#9fb3c8'}},y:{ticks:{color:'#9fb3c8'}}}});}
   function renderKPIs(k){
@@ -83,7 +80,6 @@
   }
   function renderInsights(list){
     $('recs').innerHTML=(list||[]).map(insightCard).join('')||'<div class="sub">No insights yet.</div>';
-    // wire Add/Remove buttons inside cards
     var buttons = $('recs').querySelectorAll('button[data-insight]');
     for(var i=0;i<buttons.length;i++){
       buttons[i].addEventListener('click', function(ev){
@@ -103,7 +99,7 @@
   function showModal(){ var m=$('modal'); if(m) m.style.display='flex'; }
   function hideModal(){ var m=$('modal'); if(m) m.style.display='none'; }
 
-  // ----- data loads -----
+  // ---- loads ----
   function refreshHealth(){ return call('/api/test').then(showOut).catch(showOut); }
   function seedDemo(){ return call('/api/seed',{method:'POST'}).then(function(d){showOut(d);toast('Seeded');return loadAll();}).catch(showOut); }
   function loadKPIs(){ return call('/api/kpis').then(renderKPIs).catch(showOut); }
@@ -113,7 +109,6 @@
     return call('/api/posts').then(function(d){
       $('posts').innerHTML=(d.posts||[]).map(function(p){ return '<div class="badge">'+p.platform+'</div> '+(p.title||'')+' <span class="sub">· '+(p.caption||'')+'</span>'; }).join('<br>')||'<div class="sub">No posts yet.</div>';
     }).catch(function(){
-      // not signed in — show demo posts
       call('/api/posts_demo').then(function(d){
         $('posts').innerHTML=(d.posts||[]).map(function(p){ return '<div class="badge">'+p.platform+'</div> '+(p.title||'')+' <span class="sub">· '+(p.caption||'')+'</span>'; }).join('<br>');
       });
@@ -121,7 +116,7 @@
   }
   function pullPosts(){ return call('/api/social/mock_pull',{method:'POST'}).then(function(d){showOut(d);toast('Demo posts added');return loadPosts();}).catch(showOut); }
 
-  // ----- features -----
+  // ---- features ----
   function generatePlaybook(){
     var body = selectedForPlan.size ? {insight_ids:Array.from(selectedForPlan)} : {};
     return call('/api/playbook',{method:'POST',body:JSON.stringify(body)}).then(function(d){ showOut(d); renderPlan(d.plan||[]); showModal(); }).catch(showOut);
@@ -142,7 +137,7 @@
     }).catch(function(){ $('connections').innerHTML='<span class="sub">Sign in to view connections.</span>'; });
   }
 
-  // ----- contact -----
+  // ---- contact ----
   function submitContact(){
     var payload={
       name:($('c_name')||{}).value||'',
@@ -157,36 +152,21 @@
       .catch(function(){ toast('Submit error'); });
   }
 
-  // ----- wire buttons by ID -----
+  // ---- wire buttons by ID ----
   function wire(){
-    var w = [
-      ['btnAccount', openAuth],
-      ['btnHealth', refreshHealth],
-      ['btnSeed', seedDemo],
-      ['btnPull', pullPosts],
-      ['btnPlan', generatePlaybook],
-      ['btnLogout', logout],
+    var map = [
+      ['btnAccount', openAuth], ['btnCloseAuth', closeAuth],
+      ['btnDoRegister', register], ['btnDoLogin', login], ['btnLogout', logout],
+      ['btnHealth', refreshHealth], ['btnSeed', seedDemo], ['btnPull', pullPosts],
+      ['btnPlan', generatePlaybook], ['btnPlan2', generatePlaybook], ['btnClearSel', clearSelection],
       ['btnAskAI', askAI],
-      ['btnIG', function(){connect('instagram');}],
-      ['btnTT', function(){connect('tiktok');}],
-      ['btnFB', function(){connect('facebook');}],
-      ['btnYT', function(){connect('youtube');}],
-      ['btnClearSel', clearSelection],
-      ['btnContact', submitContact],
-      ['btnClosePlan', hideModal]
+      ['btnIG', function(){connect('instagram')}], ['btnTT', function(){connect('tiktok')}],
+      ['btnFB', function(){connect('facebook')}], ['btnYT', function(){connect('youtube')}],
+      ['btnContact', submitContact], ['btnClosePlan', function(){hideModal()}],
     ];
-    for(var i=0;i<w.length;i++){ var b=$(w[i][0]); if(b) b.addEventListener('click', w[i][1]); }
+    for(var i=0;i<map.length;i++){ var b=$(map[i][0]); if(b) b.addEventListener('click', map[i][1]); }
   }
 
-  function loadAll(){
-    wire();
-    Promise.allSettled([refreshAuthBadge(),refreshHealth(),loadKPIs(),loadTrends(),loadRecs(),loadConnections(),loadPosts()])
-      .then(function(){ /* loaded */ })
-      .catch(function(e){ showOut(e); });
-  }
-
+  function loadAll(){ wire(); Promise.allSettled([refreshAuthBadge(),refreshHealth(),loadKPIs(),loadTrends(),loadRecs(),loadConnections(),loadPosts()]); }
   document.addEventListener('DOMContentLoaded', loadAll);
-
-  // expose minimal for modal actions inside the auth form
-  window.register=register; window.login=login; window.closeAuth=closeAuth;
 })();

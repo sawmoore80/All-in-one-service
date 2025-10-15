@@ -2,126 +2,109 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>AdMind — AI Platform for Ad Agencies</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>AdMind — Premium Optimization</title>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/app.css">
 </head>
 <body>
-  <div class="container">
-    <div class="header">
-      <div class="logo">
-        <span class="logo-dot"></span>
-        <div>
-          <div class="h1">AdMind</div>
-          <div class="sub">Premium optimization workspace</div>
-        </div>
-      </div>
-      <div class="toolbar">
-        <span id="authBadge" class="badge">Guest</span>
-        <button class="btn" id="btnAccount">Account</button>
-        <button class="btn" id="btnHealth">Health</button>
-        <button class="btn" id="btnSeed">Seed Demo</button>
-        <button class="btn" id="btnPull">Pull Demo Posts</button>
-        <button class="btn primary" id="btnPlan">7-Day Plan</button>
-        <button class="btn danger" id="btnLogout">Logout</button>
-      </div>
-    </div>
-
-    <div class="grid cols-3">
-      <div class="card"><h3>KPIs</h3><div id="kpis" class="kpis"></div></div>
-      <div class="card"><h3>Spend & ROAS Trend</h3><div class="chart-wrap"><canvas id="trendChart" height="130"></canvas></div></div>
-      <div class="card"><h3>Top Click Drivers</h3><div class="chart-wrap"><canvas id="topChart" height="130"></canvas></div></div>
-    </div>
-
-    <div class="grid" style="margin-top:16px">
-      <div class="card">
-        <h3>Connections</h3>
-        <div id="connections" class="conn"></div>
-        <div class="conn-buttons">
-          <button class="btn" id="btnIG">Connect Instagram</button>
-          <button class="btn" id="btnTT">Connect TikTok</button>
-          <button class="btn" id="btnFB">Connect Facebook</button>
-          <button class="btn" id="btnYT">Connect YouTube</button>
-        </div>
-      </div>
-
-      <div class="card">
-        <h3>AI Assistant</h3>
-        <div class="ai">
-          <input id="aiq" placeholder="Ask about posts, competitors, or what to test next…">
-          <button class="btn primary" id="btnAskAI">Ask</button>
-        </div>
-        <pre id="aiout">—</pre>
-      </div>
-    </div>
-
-    <div class="grid" style="margin-top:16px">
-      <div class="card">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-          <h3>Recommendations</h3>
-          <div class="sticky-actions">
-            <span class="sub">Select to include in plan</span>
-            <button class="btn" id="btnClearSel">Clear</button>
-            <button class="btn primary" id="btnPlan">Build Plan</button>
-          </div>
-        </div>
-        <div id="recs"></div>
-      </div>
-      <div class="card">
-        <h3>Posts</h3>
-        <div id="posts"></div>
-      </div>
-      <div class="card">
-        <h3>API Output</h3>
-        <pre id="out">—</pre>
-      </div>
-    </div>
-
-    <div class="grid" style="margin-top:16px">
-      <div class="card">
-        <h3>Contact Us</h3>
-        <div class="sub">Call us: <b>203-448-8241</b></div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
-          <input id="c_name" placeholder="Your name">
-          <input id="c_email" placeholder="Your email">
-          <input id="c_company" placeholder="Company (optional)">
-          <input id="c_phone" placeholder="Phone (optional)">
-        </div>
-        <textarea id="c_msg" placeholder="How can we help?" style="width:100%;margin-top:8px;height:90px;border-radius:10px;border:1px solid #1d2940;background:#0b1322;color:#e6f0ff;padding:10px"></textarea>
-        <div style="display:flex;gap:8px;margin-top:8px">
-          <button class="btn" id="btnContact">Submit</button>
-          <a class="btn primary" href="mailto:sawmoore80@gmail.com?subject=Free%20Quote%20Meeting&body=Hi%20AdMind%2C%20I%27d%20like%20a%20free%20quote.">Book Free Quote</a>
-        </div>
-      </div>
+  <div class="nav">
+    <div class="brand"><span class="dot"></span> AdMind</div>
+    <div class="nav-actions">
+      <span id="authBadge" class="pill">Guest</span>
+      <button id="btnAccount" class="btn">Account</button>
+      <button id="btnHealth" class="btn">Health</button>
+      <button id="btnSeed" class="btn">Seed Demo</button>
+      <button id="btnPull" class="btn">Pull Demo Posts</button>
+      <button id="btnPlan" class="btn primary">7-Day Plan</button>
+      <button id="btnLogout" class="btn danger">Logout</button>
     </div>
   </div>
+
+  <div class="grid">
+    <div class="card"><h3>KPIs</h3><div id="kpis" class="kpis"></div></div>
+    <div class="card"><h3>Spend & ROAS Trend</h3><canvas id="trendChart" height="180"></canvas></div>
+    <div class="card"><h3>Top Click Drivers</h3><canvas id="topChart" height="180"></canvas></div>
+  </div>
+
+  <div class="card">
+    <h3>Connections</h3>
+    <div id="connections" class="row"></div>
+    <div class="row" style="margin-top:10px;gap:8px">
+      <button id="btnIG" class="btn">Connect Instagram</button>
+      <button id="btnTT" class="btn">Connect TikTok</button>
+      <button id="btnFB" class="btn">Connect Facebook</button>
+      <button id="btnYT" class="btn">Connect YouTube</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>AI Assistant</h3>
+    <div class="ai">
+      <input id="aiq" placeholder="Ask about posts, competitors, or what to test next…">
+      <button id="btnAskAI" class="btn primary">Ask</button>
+    </div>
+    <pre id="aiout">—</pre>
+  </div>
+
+  <div class="card">
+    <div class="row between">
+      <h3>Recommendations</h3>
+      <div class="row">
+        <span class="sub">Select to include in plan</span>
+        <button id="btnClearSel" class="btn">Clear</button>
+        <button id="btnPlan2" class="btn primary">Build Plan</button>
+      </div>
+    </div>
+    <div id="recs"></div>
+  </div>
+
+  <div class="card">
+    <h3>Posts</h3>
+    <div id="posts"></div>
+  </div>
+
+  <div class="card">
+    <h3>Contact Us</h3>
+    <div class="sub">Call: <b>203-448-8241</b></div>
+    <div class="row" style="margin-top:8px;gap:8px;flex-wrap:wrap">
+      <input id="c_name" placeholder="Your name">
+      <input id="c_email" placeholder="Your email">
+      <input id="c_company" placeholder="Company">
+      <input id="c_phone" placeholder="Phone">
+    </div>
+    <textarea id="c_msg" placeholder="How can we help?"></textarea>
+    <div class="row" style="gap:8px">
+      <button id="btnContact" class="btn">Submit</button>
+      <a class="btn primary" href="mailto:sawmoore80@gmail.com?subject=Free%20Quote&body=Hi%20AdMind%2C%20I%27d%20like%20a%20free%20quote.">Book Free Quote</a>
+    </div>
+  </div>
+
+  <div class="card"><h3>API Output</h3><pre id="out">—</pre></div>
 
   <!-- Account Modal -->
   <div id="authModal" class="modal-backdrop" style="display:none">
     <div class="modal">
       <div class="head">
         <h3>Account</h3>
-        <button class="close" onclick="closeAuth()">Close</button>
+        <button id="btnCloseAuth" class="close">Close</button>
       </div>
-      <div class="auth-card" style="background:transparent;border:none;padding:0;max-width:540px">
-        <p class="muted">Create an account or sign in to save connections and see your private data.</p>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <input id="email" placeholder="Email">
-          <input id="password" type="password" placeholder="Password">
-          <button class="btn" onclick="register()">Create account</button>
-          <button class="btn primary" onclick="login()">Sign in</button>
-        </div>
-        <div style="margin-top:12px">
-          <small class="muted">Connected as: <span id="whoami">guest</span></small>
-        </div>
+      <p class="muted">Create an account or sign in to save connections and see your private data.</p>
+      <div class="row" style="gap:8px;flex-wrap:wrap">
+        <input id="email" placeholder="Email">
+        <input id="password" type="password" placeholder="Password">
+        <button id="btnDoRegister" class="btn">Create account</button>
+        <button id="btnDoLogin" class="btn primary">Sign in</button>
       </div>
+      <div style="margin-top:10px"><small class="muted">Connected as: <span id="whoami">guest</span></small></div>
     </div>
   </div>
 
+  <!-- Plan Modal -->
   <div id="modal" class="modal-backdrop" style="display:none">
     <div class="modal">
-      <div class="head"><h3>7-Day Playbook</h3><button class="close" id="btnClosePlan">Close</button></div>
+      <div class="head"><h3>7-Day Playbook</h3><button id="btnClosePlan" class="close">Close</button></div>
       <table class="table"><thead><tr><th>Day</th><th>Title</th><th>KPI</th><th>Severity</th><th>What to ship</th><th>How to measure</th></tr></thead><tbody id="planRows"></tbody></table>
     </div>
   </div>
@@ -129,7 +112,6 @@
   <div id="toast" class="toast"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" crossorigin="anonymous"></script>
-  <script src="/static/app.js?v=1760553396"></script>
-  <!-- v:force -->
+  <script src="/static/app.js?v=1"></script>
 </body>
 </html>

@@ -1,356 +1,280 @@
 import os, sqlite3, json, smtplib
-from email.mime.text import MIMEText
-from email.utils import formataddr
-
-from dotenv import load_dotenv
+from email.message import EmailMessage
 from flask import Flask, request, send_from_directory
 from flask_login import LoginManager, login_user, logout_user, login_required, UserMixin, current_user
 from flask_bcrypt import Bcrypt
+from datetime import datetime
 
-# ---------- Flask app ----------
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
-STATIC_DIR = os.path.abspath(os.path.join(APP_DIR, "..", "static"))
+ROOT_DIR = os.path.dirname(APP_DIR)
+DB_PATH = os.path.join(ROOT_DIR, "admind.db")
 
-app = Flask(__name__, static_url_path="/static", static_folder=STATIC_DIR)
-load_dotenv()
-app.secret_key = os.getenv("SECRET_KEY", "devkey")
-
+app = Flask(__name__, static_folder=os.path.join(ROOT_DIR, "static"), static_url_path="/static")
+app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY","supersecretkey")
+app.config["SESSION_COOKIE_SAMESITE"]="Lax"
+app.config["SESSION_COOKIE_SECURE"]=os.environ.get("SESSION_COOKIE_SECURE","1")=="1"
 bcrypt = Bcrypt(app)
 login_manager = LoginManager(app)
-login_manager.login_view = "api_login"
 
 # ---------- DB ----------
 def db():
-  con = sqlite3.connect(os.path.join(APP_DIR, "..", "admind.db"))
-  con.row_factory = sqlite3.Row
-  return con
+    con = sqlite3.connect(DB_PATH, check_same_thread=False)
+    con.row_factory = sqlite3.Row
+    return con
 
-with db() as con:
-  con.executescript("""
-  CREATE TABLE IF NOT EXISTS users(
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    email TEXT UNIQUE NOT NULL,
-    password_hash TEXT NOT NULL,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP
-  );
-  CREATE TABLE IF NOT EXISTS contacts(
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT, email TEXT, company TEXT, phone TEXT, message TEXT,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP
-  );
-  CREATE TABLE IF NOT EXISTS posts(
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    platform TEXT NOT NULL,
-    post_id TEXT,
-    title TEXT,
-    caption TEXT,
-    metrics_json TEXT,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP
-  );
-  """)
+def init_db():
+    con = db(); cur = con.cursor()
+    cur.execute("""CREATE TABLE IF NOT EXISTS users(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        email TEXT UNIQUE NOT NULL,
+        pw_hash TEXT NOT NULL,
+        created_at TEXT NOT NULL
+    )""")
+    cur.execute("""CREATE TABLE IF NOT EXISTS posts(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        platform TEXT, title TEXT, caption TEXT, metrics TEXT,
+        created_at TEXT NOT NULL
+    )""")
+    cur.execute("""CREATE TABLE IF NOT EXISTS contacts(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT, email TEXT, company TEXT, phone TEXT, message TEXT,
+        created_at TEXT NOT NULL
+    )""")
+    con.commit(); con.close()
+
+init_db()
 
 # ---------- Auth ----------
 class User(UserMixin):
-  def __init__(self, row):
-    self.id = row["id"]
-    self.email = row["email"]
+    def __init__(self, rid, email): self.id=rid; self.email=email
 
 @login_manager.user_loader
 def load_user(user_id):
-  with db() as con:
-    r = con.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
-  return User(r) if r else None
+    con = db(); cur = con.cursor()
+    cur.execute("SELECT id,email FROM users WHERE id=?",(user_id,))
+    row = cur.fetchone(); con.close()
+    if not row: return None
+    return User(row["id"], row["email"])
+
+# ---------- Helpers ----------
+def ok(data=None, **kw): 
+    out={"ok": True}; 
+    if data and isinstance(data, dict): out.update(data)
+    out.update(kw); 
+    return out
+
+@app.after_request
+def add_headers(resp):
+    resp.headers["Cache-Control"]="no-store"
+    resp.headers["X-AdMind"]="ok"
+    return resp
+
+# ---------- Static ----------
+@app.get("/")
+def index_root():
+    return send_from_directory(app.static_folder, "index.html")
+
+# ---------- Health ----------
+@app.get("/health")
+def health(): return ok(status="healthy")
+
+@app.get("/api/test")
+def api_test(): return ok(message="AdMind alive", user=getattr(current_user,"email","guest"))
+
+# ---------- Auth endpoints ----------
+@app.get("/api/me")
+def me():
+    if current_user.is_authenticated:
+        return ok(auth=True, email=current_user.email)
+    return ok(auth=False)
 
 @app.post("/api/register")
-def api_register():
-  d = request.get_json(force=True)
-  email = (d.get("email") or "").strip().lower()
-  pw = d.get("password") or ""
-  if not email or not pw:
-    return {"ok": False, "error": "email & password required"}, 400
-  ph = bcrypt.generate_password_hash(pw).decode("utf-8")
-  try:
-    with db() as con:
-      con.execute("INSERT INTO users(email,password_hash) VALUES(?,?)", (email, ph))
-      r = con.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
-  except sqlite3.IntegrityError:
-    return {"ok": False, "error": "user exists"}, 400
-  login_user(User(r))
-  return {"ok": True, "user": {"id": r["id"], "email": r["email"]}}
+def register():
+    payload = request.get_json(silent=True) or {}
+    email = (payload.get("email") or "").strip().lower()
+    pw = payload.get("password") or ""
+    if not email or not pw: return {"ok": False, "error":"missing_fields"}, 400
+    con = db(); cur = con.cursor()
+    try:
+        cur.execute("INSERT INTO users(email,pw_hash,created_at) VALUES(?,?,?)",
+            (email, bcrypt.generate_password_hash(pw).decode(), datetime.utcnow().isoformat()))
+        con.commit()
+        uid = cur.lastrowid
+    except sqlite3.IntegrityError:
+        con.close(); return {"ok": False, "error":"email_exists"}, 400
+    con.close()
+    login_user(User(uid,email))
+    return ok()
 
 @app.post("/api/login")
-def api_login():
-  d = request.get_json(force=True)
-  email = (d.get("email") or "").strip().lower()
-  pw = d.get("password") or ""
-  with db() as con:
-    r = con.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
-  if not r or not bcrypt.check_password_hash(r["password_hash"], pw):
-    return {"ok": False, "error": "invalid credentials"}, 401
-  login_user(User(r))
-  return {"ok": True, "user": {"id": r["id"], "email": r["email"]}}
+def login():
+    payload = request.get_json(silent=True) or {}
+    email = (payload.get("email") or "").strip().lower()
+    pw = payload.get("password") or ""
+    con = db(); cur = con.cursor()
+    cur.execute("SELECT id,email,pw_hash FROM users WHERE email=?",(email,))
+    row = cur.fetchone(); con.close()
+    if not row or not bcrypt.check_password_hash(row["pw_hash"], pw):
+        return {"ok": False, "error":"invalid_credentials"}, 400
+    login_user(User(row["id"], row["email"]))
+    return ok()
 
-@app.get("/api/logout")
-@login_required
-def api_logout():
-  logout_user()
-  return {"ok": True}
+@app.post("/api/logout")
+def logout():
+    try: logout_user()
+    except: pass
+    return ok()
 
-@app.get("/api/me")
-def api_me():
-  if current_user.is_authenticated:
-    return {"ok": True, "auth": True, "email": current_user.email}
-  return {"ok": True, "auth": False}
-
-# ---------- Health / Seed / Mock Data ----------
-@app.get("/health")
-def health():
-  return {"ok": True, "status": "healthy"}
-
+# ---------- KPIs/Trends/Insights (demo but real JSON) ----------
 @app.post("/api/seed")
 def seed_demo():
-  return {"ok": True, "message": "Demo data seeded"}
+    uid = getattr(current_user,"id",None)
+    con = db(); cur = con.cursor()
+    demo = [
+        ("Instagram","Spring Drop","New arrivals","{\"likes\": 420, \"comments\": 18}"),
+        ("TikTok","BTS","Behind the scenes","{\"plays\": 12000, \"likes\": 900}"),
+        ("YouTube","Scale ROAS","Case study","{\"views\": 8000, \"avg_view\": 3.1}")
+    ]
+    now = datetime.utcnow().isoformat()
+    for p in demo:
+        cur.execute("INSERT INTO posts(user_id,platform,title,caption,metrics,created_at) VALUES(?,?,?,?,?,?)",
+            (uid, p[0], p[1], p[2], p[3], now))
+    con.commit(); con.close()
+    return ok(message="Demo data seeded")
 
 @app.get("/api/kpis")
-def get_kpis():
-  return {"ok": True, "total_spend": 4720, "avg_roas": 1.82, "avg_cpa": 29, "conversions": 515}
+def kpis():
+    con=db(); cur=con.cursor()
+    cur.execute("SELECT COUNT(*) c FROM posts"); c=cur.fetchone()["c"]
+    con.close()
+    return {"ok": True, "total_spend": 4720, "avg_roas": 1.83, "avg_cpa": 29, "conversions": 515+c}
 
 @app.get("/api/trends")
-def get_trends():
-  labels = [f"W-{i}" for i in range(7)]
-  spend = [600, 520, 640, 580, 620, 655, 690]
-  roas = [1.6, 1.52, 1.68, 1.70, 1.75, 1.78, 1.82]
-  top = {"labels": ["Search - Brand", "Remarketing - 7d", "Prospecting - Broad", "Creators - UGC"], "clicks": [1000, 750, 720, 350]}
-  return {"ok": True, "labels": labels, "series": {"spend": spend, "roas": roas}, "top": top}
+def trends():
+    labels = [f"W-{i}" for i in range(1,8)]
+    return ok(labels=labels, series={"spend":[520,560,600,640,610,650,690],"roas":[1.55,1.62,1.68,1.7,1.73,1.78,1.82]},
+              top={"labels":["Search - Brand","RMK - 7d","Prospecting - Broad","UGC Creators"],"clicks":[1000,780,740,360]})
 
 @app.get("/api/insights")
-def get_insights():
-  return {
-    "ok": True,
-    "insights": [
-      {
-        "id": 1,
-        "title": "Lift ROAS on Prospecting - Broad",
-        "campaign_name": "Prospecting - Broad",
-        "kpi": "ROAS",
-        "severity": "high",
-        "priority_score": 1.86,
-        "evidence": {"roas": "0.72", "spend": 1250, "target_roas": "1.00"},
-        "actions": [
-          "Add price anchor (MSRP vs Now) + guarantee top-of-frame",
-          "Swap first frame to strongest review (stars + count)",
-          "Send traffic to highest-CVR LP; strip header nav"
-        ],
-        "expected_impact": 0.75
-      }
+def insights():
+    data = [
+        {
+            "id":1,"title":"Lift ROAS on Prospecting - Broad","campaign_name":"Prospecting - Broad",
+            "kpi":"ROAS","severity":"high","priority_score":1.86,
+            "evidence":{"roas":"0.72","spend":1250,"target_roas":"1.00"},
+            "actions":[
+                "Add price anchor (MSRP vs Now) + guarantee top-of-frame",
+                "Swap first frame to strongest review (stars + count)",
+                "Send traffic to highest-CVR LP; strip header nav"
+            ],
+            "expected_impact":0.75
+        },
+        {
+            "id":2,"title":"Cut CPA on RMK - 7d","campaign_name":"RMK - 7d",
+            "kpi":"CPA","severity":"med","priority_score":1.32,
+            "evidence":{"cpa":"$42","avg_cpa":"$29","delta":"+45%"},
+            "actions":["Narrow audience","Update hook + objection","Bid cap -10%"],
+            "expected_impact":0.55
+        }
     ]
-  }
+    return ok(insights=data)
 
 @app.post("/api/playbook")
-def api_playbook():
-  d = request.get_json(silent=True) or {}
-  insights = get_insights()["insights"]
-  sel = d.get("insight_ids")
-  chosen = [i for i in insights if not sel or i["id"] in set(sel)]
-  days = ["Day 1","Day 2","Day 3","Day 4","Day 5","Day 6","Day 7"]
-  plan=[]
-  for idx, ins in enumerate(chosen[:7]):
-    plan.append({
-      "day": days[idx],
-      "title": ins["title"],
-      "kpi": ins["kpi"],
-      "severity": ins["severity"],
-      "what_to_ship": ins["actions"][:3],
-      "how_to_measure": [
-        f"Primary KPI: {ins['kpi']}",
-        f"Expected impact: +{int(ins['expected_impact']*100)}%",
-        "Review after 48h; keep if KPI improves vs baseline."
-      ]
-    })
-  return {"ok": True, "plan": plan}
+def playbook():
+    payload = request.get_json(silent=True) or {}
+    sel = payload.get("insight_ids")
+    all_ins = insights()["insights"]
+    chosen = [i for i in all_ins if not sel or i["id"] in set(sel)] or all_ins[:5]
+    days = ["Day 1","Day 2","Day 3","Day 4","Day 5","Day 6","Day 7"]
+    plan=[]
+    for idx, ins in enumerate(chosen[:7]):
+        plan.append({"day":days[idx],"title":ins["title"],"kpi":ins["kpi"],"severity":ins["severity"],
+                     "what_to_ship":ins["actions"][:3],
+                     "how_to_measure":[f"Primary KPI: {ins['kpi']}", f"Expected impact: +{int(ins['expected_impact']*100)}%",
+                                      "Review after 48h; keep if KPI improves vs baseline."]})
+    return ok(plan=plan)
 
-# ---------- Social (mock) ----------
-@app.get("/api/oauth/<platform>")
-def oauth_login_mock(platform):
-  return {"ok": True, "auth_url": f"https://auth.{platform}.com/demo_oauth"}
-
-@app.get("/api/social/connections")
-def list_connections():
-  return {
-    "ok": True,
-    "connections": [
-      {"platform": "Instagram", "connected": False},
-      {"platform": "TikTok", "connected": False},
-      {"platform": "Facebook", "connected": False},
-      {"platform": "YouTube", "connected": False}
-    ]
-  }
+# ---------- Posts ----------
+@app.get("/api/posts")
+def get_posts():
+    uid = getattr(current_user,"id",None)
+    con=db(); cur=con.cursor()
+    if uid:
+        cur.execute("SELECT platform,title,caption,metrics,created_at FROM posts WHERE user_id=? ORDER BY id DESC",(uid,))
+    else:
+        cur.execute("SELECT platform,title,caption,metrics,created_at FROM posts ORDER BY id DESC")
+    rows=[dict(r) for r in cur.fetchall()]
+    con.close()
+    return ok(posts=rows)
 
 @app.post("/api/social/mock_pull")
-@login_required
-def mock_pull_posts():
-  sample = [
-    {"platform":"Instagram","post_id":"ig1","title":"Spring Drop","caption":"New arrivals","metrics":{"likes":320,"comments":18}},
-    {"platform":"TikTok","post_id":"tt1","title":"Behind the scenes","caption":"BTS shoot","metrics":{"plays":12000,"hearts":850}},
-  ]
-  with db() as con:
-    for p in sample:
-      con.execute(
-        "INSERT INTO posts(user_id,platform,post_id,title,caption,metrics_json) VALUES(?,?,?,?,?,?)",
-        (current_user.id,p["platform"],p["post_id"],p["title"],p["caption"],json.dumps(p["metrics"]))
-      )
-  return {"ok": True, "added": len(sample)}
+def social_mock_pull():
+    # adds a few more demo posts
+    uid = getattr(current_user,"id",None)
+    now = datetime.utcnow().isoformat()
+    con=db(); cur=con.cursor()
+    more=[("Instagram","UGC Hook","Try-on haul","{\"likes\": 310, \"comments\": 11}"),
+          ("TikTok","Test 3 hooks","3 cuts A/B","{\"plays\": 9000, \"likes\": 600}")]
+    for p in more:
+        cur.execute("INSERT INTO posts(user_id,platform,title,caption,metrics,created_at) VALUES(?,?,?,?,?,?)",(uid,p[0],p[1],p[2],p[3],now))
+    con.commit(); con.close()
+    return ok(added=len(more))
 
-@app.get("/api/posts")
-@login_required
-def api_posts():
-  with db() as con:
-    rows = [dict(r) for r in con.execute("SELECT platform,post_id,title,caption,metrics_json FROM posts WHERE user_id=? ORDER BY id DESC",(current_user.id,)).fetchall()]
-  for r in rows:
-    try: r["metrics"] = json.loads(r.pop("metrics_json") or "{}")
-    except: r["metrics"] = {}
-  return {"ok": True, "posts": rows}
+# ---------- Social OAuth placeholders ----------
+@app.get("/api/oauth/<platform>")
+def oauth(platform):
+    # Real OAuth requires client IDs & redirect URIs. We expose a working DEMO path.
+    demo = os.environ.get("DEMO","1")=="1"
+    if demo:
+        return ok(auth_url=f"https://auth.{platform}.com/demo")
+    return {"ok": False, "error":"configure_oauth_env"}, 400
+
+@app.get("/api/social/connections")
+def connections():
+    return ok(connections=[
+        {"platform":"Instagram","connected":False},
+        {"platform":"TikTok","connected":False},
+        {"platform":"Facebook","connected":False},
+        {"platform":"YouTube","connected":False},
+    ])
 
 # ---------- AI (mock) ----------
 @app.post("/api/ai/ask")
 def ai_ask():
-  q = (request.get_json(force=True) or {}).get("q","")
-  return {"ok": True, "answer": f"🤖 Based on '{q}', test stronger hook + social proof in first 3 seconds."}
+    q=(request.get_json(silent=True) or {}).get("q","")
+    tip = "Use a stronger first 2 seconds and add social proof."
+    if "competitor" in q.lower(): tip="Identify 3 competitors, mirror their highest-CTR hooks, then differentiate with price anchor and guarantee."
+    return ok(answer=f"🤖 On '{q}': {tip}")
 
-# ---------- Contact (store + email) ----------
-def _send_email(subject, body_text):
-  host=os.getenv("SMTP_HOST"); port=int(os.getenv("SMTP_PORT","587"))
-  user=os.getenv("SMTP_USER"); pwd=os.getenv("SMTP_PASS")
-  to=os.getenv("OWNER_EMAIL","sawmoore80@gmail.com")
-  if not (host and port and user and pwd): return False
-  msg = MIMEText(body_text, "plain")
-  msg["Subject"]=subject; msg["From"]=formataddr(("AdMind",user)); msg["To"]=to
-  s = smtplib.SMTP(host, port, timeout=10); s.starttls(); s.login(user, pwd); s.sendmail(user, [to], msg.as_string()); s.quit()
-  return True
-
+# ---------- Contact ----------
 @app.post("/api/contact")
-def api_contact():
-  d = request.get_json(force=True)
-  name=d.get("name",""); email=d.get("email",""); company=d.get("company",""); phone=d.get("phone",""); message=d.get("message","")
-  with db() as con:
-    con.execute("INSERT INTO contacts(name,email,company,phone,message) VALUES(?,?,?,?,?)",(name,email,company,phone,message))
-  emailed=False
-  try:
-    emailed=_send_email("New AdMind Contact", f"Name: {name}\nEmail: {email}\nCompany: {company}\nPhone: {phone}\n\n{message}")
-  except Exception:
+def contact():
+    p = request.get_json(silent=True) or {}
+    con=db(); cur=con.cursor()
+    cur.execute("INSERT INTO contacts(name,email,company,phone,message,created_at) VALUES(?,?,?,?,?,?)",
+                (p.get("name"),p.get("email"),p.get("company"),p.get("phone"),p.get("message"),datetime.utcnow().isoformat()))
+    con.commit(); con.close()
     emailed=False
-  return {"ok": True, "emailed": emailed}
+    # optional SMTP (set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS)
+    if os.environ.get("SMTP_HOST") and os.environ.get("SMTP_USER") and os.environ.get("SMTP_PASS"):
+        try:
+            msg = EmailMessage()
+            msg["Subject"]="AdMind Contact"
+            msg["From"]=os.environ["SMTP_USER"]
+            msg["To"]=os.environ.get("CONTACT_TO","sawmoore80@gmail.com")
+            msg.set_content(json.dumps(p, indent=2))
+            with smtplib.SMTP_SSL(os.environ["SMTP_HOST"], int(os.environ.get("SMTP_PORT","465"))) as s:
+                s.login(os.environ["SMTP_USER"], os.environ["SMTP_PASS"])
+                s.send_message(msg)
+            emailed=True
+        except Exception:
+            emailed=False
+    return ok(emailed=emailed)
 
-# ---------- Root & static ----------
-@app.get("/")
-def root_index():
-  return app.send_static_file("index.html")
-
-# ---------- Error helper (deploy diagnostics) ----------
-@app.errorhandler(Exception)
-def _err(e):
-  import traceback
-  return {"ok": False, "error": str(e), "trace": traceback.format_exc().splitlines()[-10:]}, 500
-
+# ---------- Misc ----------
 @app.get("/_ping")
-def _ping():
-    return {"ok": True, "pong": True}
-
-@app.get("/_healthz")
-def _healthz():
-    return {"ok": True}
+def _ping(): return ok(pong=True)
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
-
-@app.get("/")
-def index_root():
-    try:
-        return app.send_static_file("index.html")
-    except Exception:
-        return "<h1>AdMind</h1><p>Static not found. Ensure static/index.html exists.</p>", 200
-
-# ===== reliability & session settings =====
-import logging
-app.config.update(
-    SESSION_COOKIE_SAMESITE="Lax",
-    SESSION_COOKIE_SECURE=os.getenv("SESSION_COOKIE_SECURE","1")=="1",
-    JSON_SORT_KEYS=False,
-)
-logging.basicConfig(level=logging.INFO)
-
-@app.get("/api/ping")
-def api_ping():
-    return {"ok": True, "ts": __import__("time").time()}
-
-@app.after_request
-def _no_cache(resp):
-    resp.headers["Cache-Control"] = "no-store"
-    return resp
-
-@app.errorhandler(404)
-def _nf(e):
-    return {"ok": False, "error": "not_found", "path": request.path}, 404
-
-@app.errorhandler(500)
-def _ise(e):
-    import traceback
-    return {"ok": False, "error": "server_error", "trace": traceback.format_exc().splitlines()[-6:]}, 500
-
-# ===== idempotent: guarantee endpoints used by UI =====
-@app.post("/api/playbook")
-def api_playbook_safe():
-    d = request.get_json(silent=True) or {}
-    insights = get_insights()["insights"] if "get_insights" in globals() else []
-    sel = d.get("insight_ids")
-    chosen = [i for i in insights if not sel or i["id"] in set(sel)] or insights[:5]
-    days = ["Day 1","Day 2","Day 3","Day 4","Day 5","Day 6","Day 7"]
-    plan=[]
-    for idx, ins in enumerate(chosen[:7]):
-        plan.append({
-            "day": days[idx],
-            "title": ins.get("title","Action"),
-            "kpi": ins.get("kpi",""),
-            "severity": ins.get("severity",""),
-            "what_to_ship": (ins.get("actions") or [])[:3],
-            "how_to_measure": [
-                f"Primary KPI: {ins.get('kpi','')}",
-                f"Expected impact: +{int((ins.get('expected_impact') or 0)*100)}%",
-                "Review after 48h; keep if KPI improves vs baseline."
-            ]
-        })
-    return {"ok": True, "plan": plan}
-
-# harmless fallback KPIs / trends / insights if not defined
-if "get_kpis" not in globals():
-    @app.get("/api/kpis")
-    def get_kpis(): return {"ok": True,"total_spend":0,"avg_roas":0,"avg_cpa":0,"conversions":0}
-if "get_trends" not in globals():
-    @app.get("/api/trends")
-    def get_trends(): return {"ok": True,"labels":[],"series":{"spend":[],"roas":[]},"top":{"labels":[],"clicks":[]}}
-if "get_insights" not in globals():
-    @app.get("/api/insights")
-    def get_insights(): return {"ok": True,"insights":[]}
-
-# ===== visibility and permissive headers (same-origin safe) =====
-@app.after_request
-def _aug_headers(resp):
-    resp.headers["Cache-Control"] = "no-store"
-    resp.headers["X-AdMind"] = "ok"
-    return resp
-
-# quick test endpoint used by the UI "Health" button
-@app.get("/api/test")
-def api_test():
-    who = getattr(current_user, "email", "guest")
-    return {"ok": True, "message": "AdMind alive", "user": who}
-
-# public demo posts (so the UI shows something even if not logged in)
-@app.get("/api/posts_demo")
-def api_posts_demo():
-    return {"ok": True, "posts": [
-        {"platform":"Instagram","title":"Spring Drop","caption":"New arrivals"},
-        {"platform":"TikTok","title":"Behind the scenes","caption":"BTS shoot"},
-        {"platform":"YouTube","title":"How we scale ROAS","caption":"Case study"}
-    ]}
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT",5000)))
