@@ -1,1 +1,1 @@
-web: gunicorn --chdir backend app:app --workers 2 --threads 8 --timeout 120 --log-level info --bind 0.0.0.0:$PORT
+web: gunicorn backend.app:app --preload --workers=2 --timeout=120

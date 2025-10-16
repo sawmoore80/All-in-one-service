@@ -1,7 +1,5 @@
 import os
-
 BASE_URL = os.environ.get("BASE_URL", "http://localhost:5050")
-
 OAUTH = {
     "facebook": {
         "auth_url": "https://www.facebook.com/v19.0/dialog/oauth",

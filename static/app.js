@@ -1,23 +1,21 @@
 (function(){
-  const $=id=>document.getElementById(id);
+  const $=(id)=>document.getElementById(id);
   let trendChart, topChart, selected=new Set();
-
-  function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2000);}
+  function toast(m){const t=$('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2000);}
   function showOut(o){$('out').textContent=typeof o==='string'?o:JSON.stringify(o,null,2);}
-  async function call(path,opts={}){const r=await fetch(path,{headers:{'Content-Type':'application/json'},credentials:'include',...opts});const txt=await r.text();let d;try{d=JSON.parse(txt);}catch{d={raw:txt}};if(!r.ok) throw d; return d;}
-
+  async function call(path,opts={}){const r=await fetch(path,{headers:{'Content-Type':'application/json'},credentials:'include',...opts});const tx=await r.text();let d;try{d=JSON.parse(tx);}catch{d={raw:tx}};if(!r.ok) throw d; return d;}
   function openAuth(){ $('authModal').style.display='flex'; }
   function closeAuth(){ $('authModal').style.display='none'; }
-  async function refreshAuthBadge(){ try{const d=await call('/api/me'); $('authBadge').textContent=d.auth?(d.email||'User'):'Guest'; $('whoami').textContent=d.auth?(d.email||'user'):'guest'; }catch{ $('authBadge').textContent='Guest'; } }
-  async function register(){ const email=$('email').value, password=$('password').value; const d=await call('/api/register',{method:'POST',body:JSON.stringify({email,password})}); toast('Account created'); await refreshAuthBadge(); closeAuth(); loadAll();}
-  async function login(){ const email=$('email').value, password=$('password').value; const d=await call('/api/login',{method:'POST',body:JSON.stringify({email,password})}); toast('Signed in'); await refreshAuthBadge(); closeAuth(); loadAll();}
-  async function logout(){ await call('/api/logout',{method:'POST'}); toast('Signed out'); await refreshAuthBadge(); }
+  async function refreshAuthBadge(){ try{ const d=await call('/api/me'); $('authBadge').textContent=d.auth ? (d.email||'User') : 'Guest'; $('whoami') && ($('whoami').textContent=d.auth?(d.email||'user'):'guest'); }catch(e){ $('authBadge').textContent='Guest'; } }
+  async function register(){ const email=$('email').value, password=$('password').value; const d=await call('/api/register',{method:'POST',body:JSON.stringify({email,password})}); if(d.ok){ toast('Account created'); closeAuth(); refreshAuthBadge(); } }
+  async function login(){ const email=$('email').value, password=$('password').value; const d=await call('/api/login',{method:'POST',body:JSON.stringify({email,password})}); if(d.ok){ toast('Signed in'); closeAuth(); refreshAuthBadge(); } }
+  async function logout(){ try{ await call('/api/logout',{method:'POST'}); toast('Signed out'); refreshAuthBadge(); }catch(e){ toast('Logout error'); } }
 
   function currency(n){return '$'+(Number(n)||0).toLocaleString(undefined,{maximumFractionDigits:0});}
-  function ensureTrendChart(labels,spend,roas){const el=$('trendChart'); if(!el||!window.Chart) return; if(trendChart) trendChart.destroy(); trendChart=new Chart(el,{type:'line',data:{labels,datasets:[{label:'Spend',data:spend,borderColor:'#4ea8ff',backgroundColor:'rgba(78,168,255,.12)',yAxisID:'y',tension:.35},{label:'ROAS',data:roas,borderColor:'#f472b6',backgroundColor:'rgba(244,114,182,.10)',yAxisID:'y1',tension:.35}]},options:{maintainAspectRatio:false,plugins:{legend:{labels:{color:'#cfe3f0'}}},scales:{x:{ticks:{color:'#9fb3c8'},grid:{color:'rgba(255,255,255,.06)'}},y:{ticks:{color:'#9fb3c8'}},y1:{position:'right',ticks:{color:'#9fb3c8'},grid:{display:false}}}});}
+  function ensureTrendChart(labels,spend,roas){const el=$('trendChart'); if(!el||!window.Chart) return; if(trendChart) trendChart.destroy(); trendChart=new Chart(el,{type:'line',data:{labels,datasets:[{label:'Spend',data:spend,borderColor:'#4ea8ff',backgroundColor:'rgba(78,168,255,.12)',yAxisID:'y',tension:.35},{label:'ROAS',data:roas,borderColor:'#6ee7b7',backgroundColor:'rgba(110,231,183,.10)',yAxisID:'y1',tension:.35}]},options:{maintainAspectRatio:false,plugins:{legend:{labels:{color:'#cfe3f0'}}},scales:{x:{ticks:{color:'#9fb3c8'},grid:{color:'rgba(255,255,255,.06)'}},y:{ticks:{color:'#9fb3c8'}},y1:{position:'right',ticks:{color:'#9fb3c8'},grid:{display:false}}}});}
   function ensureTopChart(labels,clicks){const el=$('topChart'); if(!el||!window.Chart) return; if(topChart) topChart.destroy(); topChart=new Chart(el,{type:'bar',data:{labels,datasets:[{label:'Clicks',data:clicks,backgroundColor:'#7c3aed'}]},options:{maintainAspectRatio:false,plugins:{legend:{labels:{color:'#cfe3f0'}}},scales:{x:{ticks:{color:'#9fb3c8'}},y:{ticks:{color:'#9fb3c8'}}}});}
 
-  function renderKPIs(k){$('kpis').innerHTML=[{label:'Total Spend',value:currency(k.total_spend)},{label:'Avg ROAS',value:(k.avg_roas??0).toFixed(2)},{label:'Avg CPA',value:currency(k.avg_cpa)},{label:'Conversions',value:(k.conversions||0).toLocaleString()}].map(x=>`<div class="kpi"><div class="label">${x.label}</div><div class="value">${x.value}</div></div>`).join('');}
+  function renderKPIs(k){$('kpis').innerHTML=[{label:'Total Spend',value:currency(k.total_spend)},{label:'Avg ROAS',value:(k.avg_roas??0).toFixed?.(2)??String(k.avg_roas||0)},{label:'Avg CPA',value:currency(k.avg_cpa)},{label:'Conversions',value:(k.conversions||0).toLocaleString()}].map(x=>`<div class="kpi"><div class="label">${x.label}</div><div class="value">${x.value}</div></div>`).join('');}
   function badge(txt,cls){const klass=cls==='high'?'badge high':cls==='med'?'badge med':cls==='low'?'badge low':'badge';return `<span class="${klass}">${txt}</span>`;}
   function pretty(obj){return Object.entries(obj||{}).map(([k,v])=>`<div><span class="badge">${k}</span> <b>${v}</b></div>`).join('')}
   function insightCard(i){const sel=selected.has(i.id);return `<div class="card" style="margin:10px 0"><div style="display:flex;justify-content:space-between;gap:8px"><div><div style="font-weight:800">${i.title}</div><div class="sub">Campaign: ${i.campaign_name}</div></div><div>${badge(i.kpi,'kpi')} ${badge(i.severity,i.severity)} ${badge('Score '+i.priority_score,'low')}</div></div><div class="evidence"><b>Why:</b>${pretty(i.evidence)}</div><div><b>Actions (48h):</b><ul>${(i.actions||[]).map(a=>`<li>${a}</li>`).join('')}</ul></div><div class="sub" style="margin-top:6px">Expected impact: +${Math.round((i.expected_impact||0)*100)}%</div><div style="margin-top:10px"><button class="btn ${sel?'danger':''}" onclick="toggleSelect(${i.id})">${sel?'Remove':'Add'} to Plan</button></div></div>`;}
@@ -37,7 +35,7 @@
 
   async function generatePlaybook(){ try{ const body=selected.size?{insight_ids:[...selected]}:{}; const d=await call('/api/playbook',{method:'POST',body:JSON.stringify(body)}); showOut(d); renderPlan(d.plan||[]); showModal(); }catch(e){ showOut(e);} }
   async function askAI(){ try{ const q=$('aiq').value||''; const d=await call('/api/ai/ask',{method:'POST',body:JSON.stringify({q})}); $('aiout').textContent=d.answer||JSON.stringify(d,null,2);}catch(e){ $('aiout').textContent='AI error'; } }
-  async function connect(platform){ try{ const d=await call(`/api/oauth/${platform}`); if(d.auth_url){ window.location=d.auth_url; } else { toast('Provider not configured'); } }catch(e){ toast('Connect error'); } }
+  async function connect(platform){ try{ const d=await call(`/api/oauth/${platform}`); if(d.auth_url){ window.location = d.auth_url; } else { toast('Provider not configured'); } }catch(e){ toast('Connect error'); } }
 
   function wire(){
     const w=[
@@ -54,4 +52,5 @@
 
   async function loadAll(){ wire(); await Promise.allSettled([refreshAuthBadge(),refreshHealth(),loadKPIs(),loadTrends(),loadRecs(),loadPosts()]); }
   document.addEventListener('DOMContentLoaded', loadAll);
+  window.toggleSelect=toggleSelect; // needed for insight buttons
 })();
